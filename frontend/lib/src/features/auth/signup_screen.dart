@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:trustwallet_frontend/src/api.dart';
+import 'package:image_picker/image_picker.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -22,6 +24,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool agreeToTerms = false;
+  XFile? _faceImage;
 
   @override
   void dispose() {
@@ -40,6 +43,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
+      appBar: AppBar(
+        backgroundColor: Color.fromARGB(255, 2, 101, 250),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/signin'),
+        ),
+        title: const Text(
+          'Sign Up',
+          style: TextStyle(
+            fontFamily: 'InstrumentSans',
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 245, 245, 245),
+            letterSpacing: -0.1,
+          ),
+        ),
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -89,6 +110,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
+                    // Face Capture
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundImage: _faceImage != null
+                              ? FileImage(File(_faceImage!.path))
+                              : null,
+                          child: _faceImage == null
+                              ? const Icon(
+                                  Icons.person_outline,
+                                  size: 28,
+                                  color: Color(0xFF2196F3),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.camera_alt_rounded),
+                          label: const Text('Capture Face'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2196F3),
+                          ),
+                          onPressed: () async {
+                            final picker = ImagePicker();
+                            final img = await picker.pickImage(
+                              source: ImageSource.camera,
+                              preferredCameraDevice: CameraDevice.front,
+                              imageQuality: 85,
+                            );
+                            if (img != null) {
+                              setState(() => _faceImage = img);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     // Name Field
                     TextFormField(
                       controller: nameController,
@@ -492,8 +551,60 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           as Map<String, dynamic>;
                                   final token = data['access_token'] as String?;
                                   if (token != null) {
-                                    authToken =
-                                        token; // make future calls include Authorization
+                                    authToken = token; // include Authorization
+                                    // Enroll face if captured
+                                    if (_faceImage != null) {
+                                      try {
+                                        final file = File(_faceImage!.path);
+                                        final fileExists = await file.exists();
+                                        print(
+                                          'Face enrollment: File exists=$fileExists, path=${_faceImage!.path}',
+                                        );
+
+                                        if (!fileExists) {
+                                          print(
+                                            'Face enrollment: File does not exist!',
+                                          );
+                                        } else {
+                                          final fileSize = await file.length();
+                                          print(
+                                            'Face enrollment: File size=$fileSize bytes',
+                                          );
+
+                                          final req = http.MultipartRequest(
+                                            'POST',
+                                            Uri.parse(enroll_face_endpoint),
+                                          );
+                                          req.headers['Authorization'] =
+                                              'Bearer $authToken';
+                                          req.files.add(
+                                            await http.MultipartFile.fromPath(
+                                              'file',
+                                              file.path,
+                                              filename: 'face.jpg',
+                                            ),
+                                          );
+                                          print(
+                                            'Face enrollment: Sending to $enroll_face_endpoint',
+                                          );
+                                          final streamed = await req.send();
+                                          print(
+                                            'Face enrollment: Response status=${streamed.statusCode}',
+                                          );
+                                          if (streamed.statusCode != 200) {
+                                            final response = await http
+                                                .Response.fromStream(streamed);
+                                            print(
+                                              'Face enrollment: Error response=${response.body}',
+                                            );
+                                          } else {
+                                            print('Face enrollment: Success!');
+                                          }
+                                        }
+                                      } catch (e) {
+                                        print('Face enrollment error: $e');
+                                      }
+                                    }
                                     if (!mounted) return;
                                     context.go('/home');
                                     return;

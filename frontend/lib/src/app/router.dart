@@ -9,7 +9,7 @@ import '../features/dashboard/home_screen.dart';
 import '../features/send/send_entry_screen.dart';
 import '../features/send/send_confirm_screen.dart';
 import '../features/receipt/receipt_screen.dart';
-import '../features/cashin/cash_in_screen.dart';
+import '../features/cashin/cashin_screen.dart';
 import '../features/cashout/cash_out_screen.dart';
 import '../features/merchant/scan_screen.dart';
 import '../features/merchant/merchant_profile_screen.dart';
@@ -39,8 +39,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/receipt',
         builder: (context, state) => const ReceiptScreen(),
       ),
-      /*GoRoute(path: '/cashin', builder: (_, __) => const CashInScreen()),
-      GoRoute(path: '/cashout', builder: (_, __) => const CashOutScreen()),*/
+      GoRoute(path: '/cashin', builder: (_, __) => const CashInScreen()),
+      GoRoute(path: '/cashout', builder: (_, __) => const CashOutScreen()),
       GoRoute(path: '/scan', builder: (_, __) => const ScanScreen()),
       GoRoute(
         path: '/pay/confirm',

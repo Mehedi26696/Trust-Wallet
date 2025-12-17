@@ -18,8 +18,6 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _obscureText = true;
   bool rememberMe = false;
 
-
-
   String? _accessToken;
 
   @override
@@ -35,6 +33,24 @@ class _SignInScreenState extends State<SignInScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
+      appBar: AppBar(
+        backgroundColor: Color.fromARGB(255, 2, 101, 250),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/onboarding'),
+        ),
+        title: const Text(
+          'Sign In',
+          style: TextStyle(
+            fontFamily: 'InstrumentSans',
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 245, 245, 245),
+            letterSpacing: -0.1,
+          ),
+        ),
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -201,7 +217,12 @@ class _SignInScreenState extends State<SignInScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromARGB(255, 41, 43, 44),
+                          backgroundColor: const Color.fromARGB(
+                            255,
+                            41,
+                            43,
+                            44,
+                          ),
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(
                             vertical: 14,
@@ -225,14 +246,18 @@ class _SignInScreenState extends State<SignInScreen> {
                               );
 
                               if (res.statusCode == 200) {
-                                final data = jsonDecode(res.body) as Map<String, dynamic>;
+                                final data =
+                                    jsonDecode(res.body)
+                                        as Map<String, dynamic>;
                                 _accessToken = data['access_token'] as String?;
                                 // Optional: you can also read data['expires_in'] if needed.
 
                                 if (_accessToken == null) {
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Invalid server response.')),
+                                    const SnackBar(
+                                      content: Text('Invalid server response.'),
+                                    ),
                                   );
                                   return;
                                 }
@@ -252,7 +277,11 @@ class _SignInScreenState extends State<SignInScreen> {
                             } catch (e) {
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Network error. Please try again.')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Network error. Please try again.',
+                                  ),
+                                ),
                               );
                             }
                           }

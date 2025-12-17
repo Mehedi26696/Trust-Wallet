@@ -4,14 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:trustwallet_frontend/src/api.dart';
 
-class CashOutScreen extends StatefulWidget {
-  const CashOutScreen({super.key});
+class CashInScreen extends StatefulWidget {
+  const CashInScreen({super.key});
 
   @override
-  State<CashOutScreen> createState() => _CashOutScreenState();
+  State<CashInScreen> createState() => _CashInScreenState();
 }
 
-class _CashOutScreenState extends State<CashOutScreen> {
+class _CashInScreenState extends State<CashInScreen> {
   final _formKey = GlobalKey<FormState>();
   final amountController = TextEditingController();
   final descriptionController = TextEditingController();
@@ -24,15 +24,20 @@ class _CashOutScreenState extends State<CashOutScreen> {
     super.dispose();
   }
 
-  Future<void> _cashOut() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _cashIn() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final amount = double.parse(amountController.text.trim());
       final description = descriptionController.text.trim();
 
-      final uri = Uri.parse('$BASE_URL_LOCAL/api/v1/cashout');
+      final uri = Uri.parse('$BASE_URL_LOCAL/api/v1/cashin');
       final res = await http.post(
         uri,
         headers: {
@@ -49,22 +54,23 @@ class _CashOutScreenState extends State<CashOutScreen> {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final newBalance = (data['balance'] as num?)?.toDouble() ?? 0.0;
+        final newBalance = data['balance'] as double? ?? 0.0;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Successfully withdrew BDT ${amount.toStringAsFixed(2)}. New balance: BDT ${newBalance.toStringAsFixed(2)}',
+              'Successfully added BDT ${amount.toStringAsFixed(2)}. New balance: BDT ${newBalance.toStringAsFixed(2)}',
             ),
             backgroundColor: Colors.green,
           ),
         );
 
+        // Clear form and go back
         amountController.clear();
         descriptionController.clear();
-        context.go('/home');
+        context.pop();
       } else {
-        String msg = 'Failed to cash out';
+        String msg = 'Failed to add funds';
         try {
           final err = jsonDecode(res.body);
           if (err is Map && err['detail'] != null) {
@@ -75,6 +81,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
         } catch (_) {
           msg = res.body.isNotEmpty ? res.body : msg;
         }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
@@ -88,7 +95,9 @@ class _CashOutScreenState extends State<CashOutScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -98,7 +107,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cash Out'),
+        title: const Text('Cash In'),
         centerTitle: true,
         elevation: 0,
         backgroundColor: const Color.fromARGB(255, 2, 128, 253),
@@ -127,7 +136,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 20),
-                // Amount
+                // Amount Field
                 TextFormField(
                   controller: amountController,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -179,18 +188,20 @@ class _CashOutScreenState extends State<CashOutScreen> {
                     }
                     try {
                       final amount = double.parse(value);
-                      if (amount <= 0) return 'Amount must be greater than 0';
+                      if (amount <= 0) {
+                        return 'Amount must be greater than 0';
+                      }
                       if (amount > 10000000) {
                         return 'Amount cannot exceed 10,000,000 BDT';
                       }
-                    } catch (_) {
+                    } catch (e) {
                       return 'Please enter a valid amount';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 18),
-                // Description
+                // Description Field
                 TextFormField(
                   controller: descriptionController,
                   keyboardType: TextInputType.text,
@@ -206,7 +217,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
                       letterSpacing: -0.5,
                     ),
                     prefixIcon: const Icon(Icons.description_rounded),
-                    hintText: 'e.g., ATM withdrawal, bank transfer',
+                    hintText: 'e.g., Bank deposit, Salary, etc.',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20),
                       borderSide: const BorderSide(
@@ -237,7 +248,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
                   },
                 ),
                 const SizedBox(height: 32),
-                // Cash Out Button
+                // Add Funds Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -249,7 +260,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
                         borderRadius: BorderRadius.circular(18),
                       ),
                     ),
-                    onPressed: _isLoading ? null : _cashOut,
+                    onPressed: _isLoading ? null : _cashIn,
                     child: _isLoading
                         ? const SizedBox(
                             height: 24,
@@ -262,7 +273,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
                             ),
                           )
                         : const Text(
-                            'Cash Out',
+                            'Cash In',
                             style: TextStyle(
                               fontFamily: 'InstrumentSans',
                               fontSize: 20,
@@ -274,7 +285,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Cancel
+                // Cancel Button
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(

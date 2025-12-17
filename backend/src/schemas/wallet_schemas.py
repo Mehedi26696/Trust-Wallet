@@ -18,6 +18,30 @@ class WalletResponse(BaseModel):
         }
 
 
+class AddFundsRequest(BaseModel):
+    """Schema for adding funds to user wallet."""
+    amount: float = Field(..., gt=0, le=10000000, description="Amount to add in BDT (max 10M)")
+    description: Optional[str] = Field(None, max_length=255, description="Optional note about the deposit")
+    
+    @field_validator('amount')
+    @classmethod
+    def validate_amount(cls, v: float) -> float:
+        """Validate amount is positive and not too large."""
+        if v <= 0:
+            raise ValueError('Amount must be greater than 0')
+        if v > 10000000:
+            raise ValueError('Amount cannot exceed 10,000,000 BDT')
+        return round(v, 2)
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "amount": 5000.0,
+                "description": "Deposit from bank account"
+            }
+        }
+
+
 class WalletSendRequest(BaseModel):
     """Schema for wallet send money request."""
     receiver_phone: str = Field(..., description="Phone number of the receiver (Bangladesh format)")

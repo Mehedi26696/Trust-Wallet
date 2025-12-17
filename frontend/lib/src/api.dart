@@ -18,6 +18,9 @@ String preview_send_endpoint = BASE_URL_LOCAL + "/api/v1/wallet/preview-send";
 String confirm_send_endpoint = BASE_URL_LOCAL + "/api/v1/wallet/confirm-send";
 String send_money_endpoint = BASE_URL_LOCAL + "/api/v1/wallet/send";
 
+// Face endpoints
+String enroll_face_endpoint = BASE_URL_LOCAL + "/api/v1/face/enroll";
+String verify_face_endpoint = BASE_URL_LOCAL + "/api/v1/face/verify";
 
 String? authToken;
 Map<String, String> authHeaders() => {

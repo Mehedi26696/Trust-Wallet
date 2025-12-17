@@ -19,6 +19,7 @@ from ..schemas.transaction_schemas import (
 from ..schemas.wallet_schemas import (
     WalletSendRequest, 
     WalletResponse,
+    AddFundsRequest,
     RiskCheckRequest,
     RiskCheckResponse,
     TransactionPreviewRequest,
@@ -56,7 +57,132 @@ async def get_wallet_balance(
     )
 
 
+@router.post("/wallet/add-funds", response_model=WalletResponse)
+async def add_funds(
+    add_funds_request: AddFundsRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Add funds to user's wallet account.
+    
+    - **amount**: Amount to deposit in BDT (max 10,000,000)
+    - **description**: Optional note about the deposit
+    
+    Returns updated wallet balance.
+    Requires valid JWT token for authentication.
+    """
+    try:
+        # Update user's wallet balance
+        new_balance = current_user.wallet_balance + add_funds_request.amount
+        
+        # Update in database
+        current_user.wallet_balance = new_balance
+        session.add(current_user)
+        session.commit()
+        session.refresh(current_user)
+        
+        return WalletResponse(
+            user_id=current_user.id,
+            balance=current_user.wallet_balance
+        )
+    
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add funds: {str(e)}"
+        )
+
+
+@router.post("/cashin", response_model=WalletResponse)
+async def cashin(
+    add_funds_request: AddFundsRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Cash in to user's wallet (alias for add-funds).
+    
+    - **amount**: Amount to deposit in BDT (max 10,000,000)
+    - **description**: Optional note about the deposit
+    
+    Returns updated wallet balance.
+    Requires valid JWT token for authentication.
+    """
+    try:
+        # Update user's wallet balance
+        new_balance = current_user.wallet_balance + add_funds_request.amount
+        
+        # Update in database
+        current_user.wallet_balance = new_balance
+        session.add(current_user)
+        session.commit()
+        session.refresh(current_user)
+        
+        return WalletResponse(
+            user_id=current_user.id,
+            balance=current_user.wallet_balance
+        )
+    
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add funds: {str(e)}"
+        )
+
+
 # Removed old autoencoder endpoint - now using XGBoost for fraud detection
+
+
+@router.post("/cashout", response_model=WalletResponse)
+async def cashout(
+    cashout_request: AddFundsRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Cash out (withdraw) from user's wallet.
+    
+    - **amount**: Amount to withdraw in BDT (must be > 0)
+    - **description**: Optional note about the withdrawal
+    
+    Returns updated wallet balance.
+    Requires valid JWT token for authentication.
+    """
+    try:
+        amount = cashout_request.amount
+        # Validate sufficient balance
+        if amount <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Amount must be greater than 0"
+            )
+        if current_user.wallet_balance < amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Insufficient balance"
+            )
+
+        # Subtract and persist
+        current_user.wallet_balance = current_user.wallet_balance - amount
+        session.add(current_user)
+        session.commit()
+        session.refresh(current_user)
+
+        return WalletResponse(
+            user_id=current_user.id,
+            balance=current_user.wallet_balance
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to cash out: {str(e)}"
+        )
 
 
 @router.post("/ml/predict-fraud")

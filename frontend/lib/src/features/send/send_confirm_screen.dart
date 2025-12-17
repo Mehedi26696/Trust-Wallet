@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import '../../api.dart';
-
+import 'package:image_picker/image_picker.dart';
 
 class SendConfirmScreen extends StatefulWidget {
   const SendConfirmScreen({super.key});
@@ -23,7 +23,62 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
   );
 
   bool _verifying = false;
-  bool _otpPassed = false;
+  bool _faceVerified = false;
+
+  Future<void> _verifyFaceNow() async {
+    final picker = ImagePicker();
+    final img = await picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 85,
+    );
+    if (img == null) return;
+
+    try {
+      final req = http.MultipartRequest(
+        'POST',
+        Uri.parse(verify_face_endpoint),
+      );
+      req.headers['Authorization'] = 'Bearer $authToken';
+      req.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          img.path,
+          filename: 'verify.jpg',
+        ),
+      );
+      final resp = await req.send();
+      if (resp.statusCode == 200) {
+        final body = await resp.stream.bytesToString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final ok = json['verified'] == true;
+        setState(() => _faceVerified = ok);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ok ? 'Face verified' : 'Face verification failed'),
+            backgroundColor: ok ? const Color(0xFF4CAF50) : Colors.red,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Face verification failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error during face verification'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   // Simple anomaly rule for demo
   bool _needsStepUp(String level, num amount) {
@@ -54,108 +109,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
     }
   }
 
-  Future<void> _startStepUp(BuildContext context) async {
-    final controller = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Additional Verification',
-          style: TextStyle(
-            fontFamily: 'InstrumentSans',
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter the 6-digit code we just sent (demo code: 123456).',
-              style: TextStyle(fontFamily: 'InstrumentSans'),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'InstrumentSans',
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 8,
-              ),
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: '••••••',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF2196F3)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF2196F3),
-                    width: 2,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                fontFamily: 'InstrumentSans',
-                color: Colors.grey,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2196F3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              if (controller.text == '123456') {
-                Navigator.pop(context, true);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Invalid code'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text(
-              'Verify',
-              style: TextStyle(fontFamily: 'InstrumentSans'),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true) {
-      setState(() => _otpPassed = true);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification successful'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
-      }
-    }
-  }
+  // Removed OTP step-up flow; face verification is the only step-up.
 
   @override
   Widget build(BuildContext context) {
@@ -430,9 +384,39 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
             ),
             if (needsStepUp) ...[
               const SizedBox(height: 8),
-              const Text(
-                'Unusual activity detected. Additional verification required.',
-                style: TextStyle(color: Color(0xFFE65100)),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE65100)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFE65100),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Unusual activity detected. Please verify your face to continue.',
+                        style: const TextStyle(color: Color(0xFFE65100)),
+                      ),
+                    ),
+                    if (!_faceVerified)
+                      TextButton(
+                        onPressed: _verifyFaceNow,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: const Color(0xFF1976D2),
+                        ),
+                        child: const Text('Verify Face'),
+                      )
+                    else
+                      const Icon(Icons.verified, color: Color(0xFF4CAF50)),
+                  ],
+                ),
               ),
             ],
 
@@ -477,236 +461,336 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                     onPressed: _verifying
                         ? null
                         : () async {
-                      if (needsStepUp && !_otpPassed) {
-                        await _startStepUp(context);
-                        if (!_otpPassed) return;
-                      }
-                      setState(() => _verifying = true);
-
-                      try {
-                        // Call backend confirm-send API
-                        final response = await http.post(
-                          Uri.parse(confirm_send_endpoint),
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer $authToken',
-                          },
-                          body: jsonEncode({
-                            'receiver_phone': phone,
-                            'amount': double.parse(amountStr),
-                          }),
-                        );
-
-                        if (!mounted) return;
-
-                        if (response.statusCode == 201) {
-                          final result = jsonDecode(response.body);
-                          final transaction = result['transaction'];
-                          final txnId = transaction['id'];
-
-                          // Show success and navigate to home
-                          await showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (_) => AlertDialog(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 60,
-                                    height: 60,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF4CAF50),
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 40,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Transaction Successful!',
-                                    style: TextStyle(
-                                      fontFamily: 'InstrumentSans',
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '৳${amountStr} sent to $receiverName',
-                                    style: const TextStyle(
-                                      fontFamily: 'InstrumentSans',
-                                      color: Color(0xFF626C7A),
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Transaction ID: ${txnId.toString().substring(0, 8)}...',
-                                    style: const TextStyle(
-                                      fontFamily: 'InstrumentSans',
-                                      fontSize: 12,
-                                      color: Color(0xFF9E9E9E),
-                                    ),
-                                  ),
-                                  if (result['warning'] != null) ...[
-                                    const SizedBox(height: 12),
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFF3E0),
-                                        borderRadius: BorderRadius.circular(8),
+                            // High-risk face verification (required)
+                            if (needsStepUp && !_faceVerified) {
+                              final picker = ImagePicker();
+                              final img = await picker.pickImage(
+                                source: ImageSource.camera,
+                                preferredCameraDevice: CameraDevice.front,
+                                imageQuality: 85,
+                              );
+                              if (img == null) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Face verification required',
                                       ),
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.warning_amber,
-                                            color: Color(0xFFE65100),
-                                            size: 16,
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+                              try {
+                                final req = http.MultipartRequest(
+                                  'POST',
+                                  Uri.parse(verify_face_endpoint),
+                                );
+                                req.headers['Authorization'] =
+                                    'Bearer $authToken';
+                                req.files.add(
+                                  await http.MultipartFile.fromPath(
+                                    'file',
+                                    img.path,
+                                    filename: 'verify.jpg',
+                                  ),
+                                );
+                                final resp = await req.send();
+                                if (resp.statusCode == 200) {
+                                  final body = await resp.stream
+                                      .bytesToString();
+                                  final json =
+                                      jsonDecode(body) as Map<String, dynamic>;
+                                  setState(
+                                    () => _faceVerified =
+                                        json['verified'] == true,
+                                  );
+                                  if (!_faceVerified) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Face verification failed',
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              result['warning']['reason'],
-                                              style: const TextStyle(
-                                                fontFamily: 'InstrumentSans',
-                                                fontSize: 11,
-                                                color: Color(0xFFE65100),
-                                              ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                } else {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Face verification failed',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                              } catch (_) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Error during face verification',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+                            }
+
+                            setState(() => _verifying = true);
+
+                            try {
+                              // Call backend confirm-send API
+                              final response = await http.post(
+                                Uri.parse(confirm_send_endpoint),
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': 'Bearer $authToken',
+                                },
+                                body: jsonEncode({
+                                  'receiver_phone': phone,
+                                  'amount': double.parse(amountStr),
+                                }),
+                              );
+
+                              if (!mounted) return;
+
+                              if (response.statusCode == 201) {
+                                final result = jsonDecode(response.body);
+                                final transaction = result['transaction'];
+                                final txnId = transaction['id'];
+
+                                // Show success and navigate to home
+                                await showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (_) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 60,
+                                          height: 60,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF4CAF50),
+                                            borderRadius: BorderRadius.circular(
+                                              30,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.check,
+                                            color: Colors.white,
+                                            size: 40,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          'Transaction Successful!',
+                                          style: TextStyle(
+                                            fontFamily: 'InstrumentSans',
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '৳${amountStr} sent to $receiverName',
+                                          style: const TextStyle(
+                                            fontFamily: 'InstrumentSans',
+                                            color: Color(0xFF626C7A),
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Transaction ID: ${txnId.toString().substring(0, 8)}...',
+                                          style: const TextStyle(
+                                            fontFamily: 'InstrumentSans',
+                                            fontSize: 12,
+                                            color: Color(0xFF9E9E9E),
+                                          ),
+                                        ),
+                                        if (result['warning'] != null) ...[
+                                          const SizedBox(height: 12),
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFF3E0),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.warning_amber,
+                                                  color: Color(0xFFE65100),
+                                                  size: 16,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    result['warning']['reason'],
+                                                    style: const TextStyle(
+                                                      fontFamily:
+                                                          'InstrumentSans',
+                                                      fontSize: 11,
+                                                      color: Color(0xFFE65100),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
+                                      ],
+                                    ),
+                                    actions: [
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF2196F3,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          context.go('/home');
+                                        },
+                                        child: const Text(
+                                          'Done',
+                                          style: TextStyle(
+                                            fontFamily: 'InstrumentSans',
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              actions: [
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2196F3),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
+                                    ],
                                   ),
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    context.go('/home');
-                                  },
-                                  child: const Text(
-                                    'Done',
-                                    style: TextStyle(fontFamily: 'InstrumentSans'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        } else if (response.statusCode == 409) {
-                          // Transaction blocked by ML
-                          final error = jsonDecode(response.body);
-                          final warning = error['detail']['warning'];
-                          if (mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                title: const Text(
-                                  'Transaction Blocked',
-                                  style: TextStyle(
-                                    fontFamily: 'InstrumentSans',
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFD32F2F),
-                                  ),
-                                ),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.block,
-                                      color: Color(0xFFD32F2F),
-                                      size: 48,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      warning['reason'],
-                                      style: const TextStyle(
-                                        fontFamily: 'InstrumentSans',
+                                );
+                              } else if (response.statusCode == 409) {
+                                // Transaction blocked by ML
+                                final error = jsonDecode(response.body);
+                                final warning = error['detail']['warning'];
+                                if (mounted) {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
-                                      textAlign: TextAlign.center,
+                                      title: const Text(
+                                        'Transaction Blocked',
+                                        style: TextStyle(
+                                          fontFamily: 'InstrumentSans',
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFD32F2F),
+                                        ),
+                                      ),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.block,
+                                            color: Color(0xFFD32F2F),
+                                            size: 48,
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            warning['reason'],
+                                            style: const TextStyle(
+                                              fontFamily: 'InstrumentSans',
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFF2196F3,
+                                            ),
+                                          ),
+                                          onPressed: () {
+                                            Navigator.pop(context);
+                                            context.go('/home');
+                                          },
+                                          child: const Text(
+                                            'OK',
+                                            style: TextStyle(
+                                              fontFamily: 'InstrumentSans',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                actions: [
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2196F3),
+                                  );
+                                }
+                              } else {
+                                final error = jsonDecode(response.body);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        error['detail'] ?? 'Transaction failed',
+                                      ),
+                                      backgroundColor: Colors.red,
                                     ),
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      context.go('/home');
-                                    },
-                                    child: const Text(
-                                      'OK',
-                                      style: TextStyle(fontFamily: 'InstrumentSans'),
-                                    ),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: ${e.toString()}'),
+                                    backgroundColor: Colors.red,
                                   ),
-                                ],
-                              ),
-                            );
-                          }
-                        } else {
-                          final error = jsonDecode(response.body);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(error['detail'] ?? 'Transaction failed'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error: ${e.toString()}'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      } finally {
-                        if (mounted) {
-                          setState(() => _verifying = false);
-                        }
-                      }
-                    },
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _verifying = false);
+                              }
+                            }
+                          },
                     child: _verifying
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Text(
-                      'Confirm & Send',
-                      style: TextStyle(
-                        fontFamily: 'InstrumentSans',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
+                            'Confirm & Send',
+                            style: TextStyle(
+                              fontFamily: 'InstrumentSans',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
                   ),
                 ),
               ],

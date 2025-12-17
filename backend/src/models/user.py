@@ -17,6 +17,10 @@ class User(SQLModel, table=True):
     nid: str = Field(max_length=17, description="National ID (10, 13, or 17 digits)")
     email: str = Field(unique=True, max_length=255, index=True)
     wallet_balance: float = Field(default=0.0, ge=0.0)
+    # Face enrollment
+    face_image_path: Optional[str] = Field(default=None, max_length=512, sa_column_kwargs={"nullable": True})
+    face_hash: Optional[str] = Field(default=None, max_length=128, sa_column_kwargs={"nullable": True})
+    
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)
     
