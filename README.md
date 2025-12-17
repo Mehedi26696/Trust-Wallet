@@ -43,7 +43,7 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 - **Bank-grade Security**: Multi-layered security with JWT authentication and bcrypt password hashing
 - **AI-Powered Fraud Detection**: XGBoost models for real-time transaction monitoring
 - **Bangladesh-specific**: NID validation supporting 10, 13, and 17-digit formats
-- **Modern Mobile App**: Beautiful Flutter UI 
+- **Modern Mobile App**: Beautiful Flutter UI
 - **Real-time Updates**: Supabase integration for instant transaction notifications
 - **Compliance Ready**: Transaction logging and audit trails for regulatory compliance
 
@@ -74,6 +74,7 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
   - Transaction preview before confirmation
   - Multi-step transaction verification
   - Risk assessment before transfer
+  - Clear fees and VAT applied on preview (see Fees & Charges)
 
 ### Advanced Fraud Detection
 
@@ -83,6 +84,7 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 - Velocity checks (multiple high-value transactions)
 - Risk scoring system
 - Historical behavior analysis
+  - Step-up verification: If risk score > 50%, face verification is required on confirm screen
 
 #### Rule-based Fraud Prevention
 
@@ -120,8 +122,8 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 
 ### Backend
 
-| Technology   | Purpose                         | Version |
-| ------------ | ------------------------------- | ------- |
+| Technology         | Purpose                         | Version |
+| ------------------ | ------------------------------- | ------- |
 | **FastAPI**  | Modern Python web framework     | 0.120.3 |
 | **SQLModel** | Type-safe SQL database ORM      | 2.0.44  |
 | **Supabase** | PostgreSQL database + real-time | 2.22.4  |
@@ -133,8 +135,8 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 
 ### Machine Learning
 
-| Technology       | Purpose                     | Version |
-| ---------------- | --------------------------- | ------- |
+| Technology             | Purpose                     | Version |
+| ---------------------- | --------------------------- | ------- |
 | **XGBoost**      | Fraud detection classifier  | Latest  |
 | **scikit-learn** | ML pipeline & preprocessing | 1.6.1   |
 | **pandas**       | Data manipulation           | Latest  |
@@ -143,8 +145,8 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 
 ### Frontend
 
-| Technology                 | Purpose                         | Version |
-| -------------------------- | ------------------------------- | ------- |
+| Technology                       | Purpose                         | Version |
+| -------------------------------- | ------------------------------- | ------- |
 | **Flutter**                | Cross-platform mobile framework | 3.8.1   |
 | **Dart**                   | Programming language            | 3.8.1+  |
 | **Riverpod**               | State management                | 2.6.1   |
@@ -284,7 +286,6 @@ TrustWallet/
    git clone https://github.com/yourusername/TrustWallet.git
    cd TrustWallet/backend
    ```
-
 2. **Create Virtual Environment**
 
    ```bash
@@ -300,13 +301,11 @@ TrustWallet/
    # On macOS/Linux
    source venv/bin/activate
    ```
-
 3. **Install Dependencies**
 
    ```bash
    pip install -r requirements.txt
    ```
-
 4. **Environment Configuration**
 
    ```bash
@@ -316,7 +315,6 @@ TrustWallet/
    # Edit .env with your configuration
    # See Environment Configuration section for details
    ```
-
 5. **Database Setup**
 
    **Option A: SQLite (Development)**
@@ -336,7 +334,6 @@ TrustWallet/
 
    alembic upgrade head
    ```
-
 6. **Train ML Models (Optional)**
 
    ```bash
@@ -345,7 +342,6 @@ TrustWallet/
 
    # The model will be saved to models/xgboost_pipeline_fraud.pkl
    ```
-
 7. **Run the Backend**
 
    ```bash
@@ -357,7 +353,6 @@ TrustWallet/
    - Main API: http://localhost:8000
    - Interactive Docs: http://localhost:8000/docs
    - ReDoc: http://localhost:8000/redoc
-
 8. **Verify Setup**
 
    ```bash
@@ -375,13 +370,11 @@ TrustWallet/
    ```bash
    cd frontend
    ```
-
 2. **Install Flutter Dependencies**
 
    ```bash
    flutter pub get
    ```
-
 3. **Configure API Endpoint**
 
    ```dart
@@ -392,13 +385,17 @@ TrustWallet/
    // For iOS Simulator use: http://localhost:8000
    // For physical device use your computer's IP address
    ```
+4. **Send Flow & Risk UX**
+
+- On Send Entry, you can preview a transaction. Risk dialogs (high/medium) are informational and do not block navigation.
+- On Confirm screen, if the backend risk score is > 50%, face verification is required before sending.
+- Fees and VAT display on both Entry and Confirm screens.
 
 4. **Check Flutter Setup**
 
    ```bash
    flutter doctor
    ```
-
 5. **Run the App**
 
    ```bash
@@ -414,15 +411,14 @@ TrustWallet/
    # Run in release mode
    flutter run --release
    ```
-
 6. **Build APK (Android)**
 
    ```bash
    flutter build apk --release
    # APK will be at: build/app/outputs/flutter-apk/app-release.apk
    ```
-
 7. **Build iOS App**
+
    ```bash
    flutter build ios --release
    # Open in Xcode for signing and deployment
@@ -431,6 +427,73 @@ TrustWallet/
 ---
 
 ## API Documentation
+
+### Key Endpoints (Wallet)
+
+- Preview send
+
+  ```http
+  POST /api/v1/wallet/preview-send
+  Authorization: Bearer <jwt>
+  Content-Type: application/json
+
+  {
+    "receiver_phone": "+8801712345678",
+    "amount": 1000
+  }
+  ```
+
+  Response
+
+  ```json
+  {
+    "sender_balance": 5000.0,
+    "receiver_name": "John Doe",
+    "receiver_phone": "+8801712345678",
+    "amount": 1000.0,
+    "fee": 10.0,
+    "vat": 5.0,
+    "total_deducted": 1015.0,
+    "new_balance": 3985.0,
+    "risk_check": {
+      "risk_level": "medium",
+      "risk_score": 0.62,   // 0..1
+      "threshold": 0.5,
+      "can_proceed": true,
+      "warnings": ["Moderate fraud risk detected"],
+      "details": {}
+    },
+    "can_proceed": true
+  }
+  ```
+- Confirm send
+
+  ```http
+  POST /api/v1/wallet/confirm-send
+  Authorization: Bearer <jwt>
+  Content-Type: application/json
+
+  {
+    "receiver_phone": "+8801712345678",
+    "amount": 1000
+  }
+  ```
+
+  - If risk score > 50%, the mobile app must perform face verification before calling this endpoint.
+  - Server may still block for rule-based high severity or ML if configured.
+
+---
+
+## Fees & Charges
+
+- **Transaction Fee**: ৳10 per ৳1000 (1.0%)
+- **Service VAT**: ৳5 per ৳1000 (0.5%)
+- **Total Deducted**: `amount + fee + vat`
+
+Notes:
+
+- The preview endpoint returns `fee`, `vat`, and `total_deducted` so the UI can display exact amounts.
+- The confirm/send endpoint deducts the total from sender; receiver receives the base `amount`.
 
 ### Base URL
 
@@ -785,7 +848,6 @@ For complete API documentation, visit the interactive docs at `/docs` when runni
    - `oldbalanceDest`, `newbalanceDest`
    - `isFraud` (target label)
    - `step` (time unit)
-
 2. **Run Training Script**:
 
    ```bash
@@ -800,7 +862,6 @@ For complete API documentation, visit the interactive docs at `/docs` when runni
    - Build preprocessing pipeline
    - Train XGBoost classifier
    - Save the complete pipeline
-
 3. **Model Artifacts**:
 
    - `xgboost_pipeline_fraud.pkl`: Complete trained pipeline (preprocessor + classifier)

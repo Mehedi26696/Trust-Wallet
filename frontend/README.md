@@ -1,16 +1,32 @@
-# trustwallet_frontend
+# TrustWallet Frontend (Flutter)
 
-A new Flutter project.
+Flutter mobile app for TrustWallet with send flow, risk checks, and face verification.
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+Configure API base URL in `lib/src/api.dart`:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```dart
+// For emulator/simulator or device
+String BASE_URL_LOCAL = "http://YOUR_IP_OR_10.0.2.2:8000";
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Send Flow
+
+- Entry screen: enter recipient phone and amount, then Continue to preview.
+- Risk banner/dialogs are informational; navigation proceeds to Confirm.
+- Confirm screen: if risk score > 50%, face verification is required before sending.
+- Backend may block for high severity rule checks even after confirm.
+
+## Fees & Totals
+
+- Transaction Fee: ৳10 per ৳1000 (1.0%)
+- Service VAT: ৳5 per ৳1000 (0.5%)
+- Total Payable = `amount + fee + vat`
+
+The preview API returns `fee`, `vat`, and `total_deducted`. The UI displays fees on Entry and Confirm screens.

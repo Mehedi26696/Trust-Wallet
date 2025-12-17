@@ -123,7 +123,7 @@ GET /api/v1/profile
 Authorization: Bearer <jwt_token>
 ```
 
-### Wallet Endpoints
+### Wallet Endpoints (Preview + Confirm)
 
 #### Get Balance
 ```http
@@ -131,17 +131,64 @@ GET /api/v1/wallet
 Authorization: Bearer <jwt_token>
 ```
 
-#### Send Money
+#### Preview Send
 ```http
-POST /api/v1/wallet/send
+POST /api/v1/wallet/preview-send
 Authorization: Bearer <jwt_token>
 Content-Type: application/json
 
 {
-  "receiver_email": "receiver@example.com",
-  "amount": 1000.0
+   "receiver_phone": "+8801712345678",
+   "amount": 1000.0
 }
 ```
+
+Response (includes fees and risk)
+```json
+{
+   "sender_balance": 5000.0,
+   "receiver_name": "John Doe",
+   "receiver_phone": "+8801712345678",
+   "amount": 1000.0,
+   "fee": 10.0,
+   "vat": 5.0,
+   "total_deducted": 1015.0,
+   "new_balance": 3985.0,
+   "risk_check": {
+      "risk_level": "medium",
+      "risk_score": 0.62,
+      "threshold": 0.5,
+      "can_proceed": true,
+      "warnings": ["Moderate fraud risk detected"],
+      "details": {}
+   },
+   "can_proceed": true
+}
+```
+
+#### Confirm Send
+```http
+POST /api/v1/wallet/confirm-send
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+   "receiver_phone": "+8801712345678",
+   "amount": 1000.0
+}
+```
+
+Frontend behavior: if preview risk score > 0.5 (50%), the app performs face verification before calling confirm.
+
+---
+
+### Fees & Charges
+
+- Transaction Fee: ৳10 per ৳1000 (1.0%)
+- Service VAT: ৳5 per ৳1000 (0.5%)
+- Total deducted = amount + fee + vat
+
+The preview endpoint returns `fee`, `vat`, and `total_deducted` for display. The confirm endpoint deducts the total from the sender; the receiver gets the base `amount`.
 
 ### Transaction Endpoints
 
