@@ -1,0 +1,37 @@
+2025-11-06 19:36:56,202:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2025-11-06 19:36:56,203:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2025-11-06 19:36:56,203:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2025-11-06 19:36:56,203:WARNING:
+'cuml' is a soft dependency and not included in the pycaret installation. Please run: `pip install cuml` to install.
+2025-11-06 19:36:58,562:INFO:Initializing load_model()
+2025-11-06 19:36:58,562:INFO:load_model(model_name=E:\Solvio\solvio-backend\ai_models\trustwallet_best_txn_v1, platform=None, authentication=None, verbose=True)
+2025-11-06 19:36:59,127:INFO:Initializing predict_model()
+2025-11-06 19:36:59,127:INFO:predict_model(self=<pycaret.anomaly.oop.AnomalyExperiment object at 0x00000233DABEBC50>, estimator=Pipeline(memory=Memory(location=None),
+         steps=[('numerical_imputer',
+                 TransformerWrapper(include=['amount', 'secs_since_prev',
+                                             'tx_count_1h', 'amt_avg_10',
+                                             'amt_std_10', 'amt_ratio_vs_avg10',
+                                             'new_merchant_flag', 'fanout_24h',
+                                             'device_change_flag',
+                                             'geo_change_flag', 'fee_pct',
+                                             'cashback_pct', 'hour_of_day',
+                                             'day_of_week'],
+                                    transformer=SimpleImputer())),
+                ('categorical_imputer',
+                 TransformerWrapper(include=[],
+                                    transformer=SimpleImputer(strategy='most_frequent'))),
+                ('normalize', TransformerWrapper(transformer=StandardScaler())),
+                ('trained_model',
+                 OCSVM(cache_size=200, coef0=0.0, contamination=0.003, degree=3, gamma='auto',
+   kernel='rbf', max_iter=-1, nu=0.5, shrinking=True, tol=0.001,
+   verbose=False))]), ml_usecase=None)
+2025-11-06 19:36:59,127:INFO:Set up data.
+2025-11-06 19:36:59,145:WARNING:E:\Solvio\solvio-backend\.venv311\Lib\site-packages\sklearn\base.py:486: UserWarning: X has feature names, but OneClassSVM was fitted without feature names
+  warnings.warn(
+
+2025-11-06 19:36:59,153:WARNING:E:\Solvio\solvio-backend\.venv311\Lib\site-packages\sklearn\base.py:486: UserWarning: X has feature names, but OneClassSVM was fitted without feature names
+  warnings.warn(
+

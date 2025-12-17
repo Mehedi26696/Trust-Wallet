@@ -1,0 +1,826 @@
+﻿// lib/src/features/send/send_entry_screen.dart
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'package:trustwallet_frontend/src/api.dart';
+import '../../mock/mock_services.dart';
+
+class SendEntryScreen extends StatefulWidget {
+  const SendEntryScreen({super.key});
+  @override
+  State<SendEntryScreen> createState() => _SendEntryScreenState();
+}
+
+class _SendEntryScreenState extends State<SendEntryScreen> {
+  // --- Controllers & services ---
+  final _phoneController = TextEditingController();
+  final _amountController = TextEditingController(text: '500');
+
+  final risk = RiskService();
+  final fees = FeeService();
+
+  // --- Debounce timer for smooth UX ---
+  Timer? _debounce;
+
+  final _bdt = NumberFormat.currency(
+    locale: 'bn_BD',
+    symbol: '৳',
+    decimalDigits: 0,
+  );
+
+  // --- State ---
+  bool _isLoading = false;
+  Map<String, dynamic> riskData = const {
+    'level': 'low',
+    'score': 12,
+    'reason': 'Normal transaction',
+  };
+
+  Map<String, num> feeData = const {'vat': 0, 'fee': 0, 'total': 0};
+
+  // Backend preview data
+  Map<String, dynamic>? _previewData;
+
+  // Limits to keep demo safe
+  static const num _minAmount = 1;
+  static const num _maxAmount = 500000;
+
+  // --- Helpers ---
+  void _triggerRecalc() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 180), _recalculate);
+  }
+
+  void _recalculate() {
+    final amount = _parseAmount(_amountController.text);
+    final clamped = amount.clamp(_minAmount, _maxAmount);
+
+    // keep field value in sync if user typed crazy-big negative etc.
+    if (clamped != amount) {
+      _amountController.text = clamped.toStringAsFixed(0);
+      _amountController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _amountController.text.length),
+      );
+    }
+
+    setState(() {
+      riskData = risk.score(_sanitizePhone(_phoneController.text), clamped);
+      feeData = fees.quote(clamped);
+    });
+  }
+
+  num _parseAmount(String raw) {
+    // Remove non-digits
+    final clean = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (clean.isEmpty) return 0;
+    return num.tryParse(clean) ?? 0;
+  }
+
+  String _sanitizePhone(String raw) {
+    // Keep digits and plus; trims spaces
+    return raw.replaceAll(RegExp(r'[^\d\+]'), '').trim();
+  }
+
+  bool get _isPhoneValid {
+    final p = _sanitizePhone(_phoneController.text);
+    // Accept: +8801XXXXXXXXX (11 digits) or 01XXXXXXXXX (11 digits)
+    if (p.isEmpty) return false;
+    // Remove +880 or 0 prefix and check if we have 10 digits
+    final cleaned = p
+        .replaceAll(RegExp(r'^\+?880'), '')
+        .replaceAll(RegExp(r'^0'), '');
+    return cleaned.length == 10 && cleaned.startsWith('1');
+  }
+
+  bool get _isAmountValid {
+    final a = _parseAmount(_amountController.text);
+    return a >= _minAmount && a <= _maxAmount;
+  }
+
+  Color _riskColor(String level) {
+    switch (level) {
+      case 'high':
+        return const Color(0xFFD32F2F);
+      case 'medium':
+        return const Color(0xFFE65100);
+      default:
+        return const Color(0xFF2E7D32);
+    }
+  }
+
+  Color _riskBg(String level) {
+    switch (level) {
+      case 'high':
+        return const Color(0xFFFFEBEE);
+      case 'medium':
+        return const Color(0xFFFFF3E0);
+      default:
+        return const Color(0xFFE8F5E9);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _recalculate();
+    _amountController.addListener(_triggerRecalc);
+    _phoneController.addListener(_triggerRecalc);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _phoneController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  // ---------------- UI ----------------
+  @override
+  Widget build(BuildContext context) {
+    // Everything below matches your current frontend layout/styles.
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        backgroundColor: Color.fromARGB(255, 2, 101, 250),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/home'),
+        ),
+        title: const Text(
+          'Send Money',
+          style: TextStyle(
+            fontFamily: 'InstrumentSans',
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 245, 245, 245),
+            letterSpacing: -0.1,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Recipient Phone Number
+              const Text(
+                'Recipient Number',
+                style: TextStyle(
+                  fontFamily: 'InstrumentSans',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.1,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(255, 75, 133, 167),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(
+                    fontFamily: 'InstrumentSans',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1E1E1E),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: '+8801XXXXXXXX',
+                    hintStyle: const TextStyle(
+                      fontFamily: 'InstrumentSans',
+                      color: Color.fromARGB(255, 194, 212, 245),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.phone_rounded,
+                      color: Color(0xFF2196F3),
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPhoneValid ? Icons.check_circle : Icons.contacts,
+                        color: _isPhoneValid
+                            ? const Color(0xFF2E7D32)
+                            : const Color(0xFF626C7A),
+                      ),
+                      onPressed: () {
+                        // Open contacts (stub)
+                      },
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Amount
+              const Text(
+                'Amount',
+                style: TextStyle(
+                  fontFamily: 'InstrumentSans',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 255, 255, 255),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Tk',
+                          style: TextStyle(
+                            fontFamily: 'InstrumentSans',
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2196F3),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _amountController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          fontFamily: 'InstrumentSans',
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E1E1E),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          hintStyle: const TextStyle(
+                            fontFamily: 'InstrumentSans',
+                            color: Color(0xFF9E9E9E),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Color(0xFF626C7A)),
+                      onPressed: () {
+                        _amountController.text = '';
+                        _triggerRecalc();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Quick Amount Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _QuickAmountButton(
+                    amount: '৳100',
+                    onTap: () => _amountController.text = '100',
+                  ),
+                  _QuickAmountButton(
+                    amount: '৳500',
+                    onTap: () => _amountController.text = '500',
+                  ),
+                  _QuickAmountButton(
+                    amount: '৳1000',
+                    onTap: () => _amountController.text = '1000',
+                  ),
+                  _QuickAmountButton(
+                    amount: '৳2000',
+                    onTap: () => _amountController.text = '2000',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Payment Method (static stub)
+              const Text(
+                'Payment Method',
+                style: TextStyle(
+                  fontFamily: 'InstrumentSans',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () {
+                  // Show payment method selector
+                  showModalBottomSheet(
+                    context: context,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    builder: (context) => Container(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Select Payment Method',
+                            style: TextStyle(
+                              fontFamily: 'InstrumentSans',
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE3F2FD),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.account_balance_wallet,
+                                color: Color(0xFF2196F3),
+                                size: 20,
+                              ),
+                            ),
+                            title: const Text('My Wallet'),
+                            trailing: const Icon(
+                              Icons.check_circle,
+                              color: Color(0xFF2196F3),
+                            ),
+                            onTap: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3F2FD),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.account_balance_wallet,
+                          color: Color(0xFF2196F3),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'My Wallet',
+                          style: TextStyle(
+                            fontFamily: 'InstrumentSans',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E1E1E),
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Color(0xFF626C7A),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // --- Risk Banner (always visible, level-colored) ---
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _riskBg(riskData['level'] as String),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _riskColor(riskData['level'] as String),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.security,
+                      color: _riskColor(riskData['level'] as String),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${riskData['reason']} — (${riskData['score']})',
+                        style: TextStyle(
+                          fontFamily: 'InstrumentSans',
+                          fontSize: 12,
+                          color: _riskColor(riskData['level'] as String),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // --- Fee Summary ---
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    _FeeRow(
+                      label: 'Transaction Fee',
+                      amount: _bdt.format(feeData['fee'] ?? 0),
+                    ),
+                    const SizedBox(height: 8),
+                    _FeeRow(
+                      label: 'Service Fee (VAT)',
+                      amount: _bdt.format(feeData['vat'] ?? 0),
+                    ),
+                    const Divider(height: 24),
+                    _FeeRow(
+                      label: 'Total Amount',
+                      amount: _bdt.format(feeData['total'] ?? 0),
+                      isBold: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Continue Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: (_isPhoneValid && _isAmountValid && !_isLoading)
+                        ? const Color(0xFF2196F3)
+                        : Colors.grey,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: (_isPhoneValid && _isAmountValid && !_isLoading)
+                      ? () async {
+                    // Call backend preview API
+                    setState(() => _isLoading = true);
+
+                    try {
+                      final response = await http.post(
+                        Uri.parse(preview_send_endpoint),
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': 'Bearer $authToken',
+                        },
+                        body: jsonEncode({
+                          'receiver_phone': _sanitizePhone(_phoneController.text),
+                          'amount': _parseAmount(_amountController.text).toDouble(),
+                        }),
+                      );
+
+                      if (!mounted) return;
+
+                      if (response.statusCode == 200) {
+                        final data = jsonDecode(response.body);
+                        _previewData = data;
+
+                        // Update risk data from backend
+                        final riskCheck = data['risk_check'];
+                        setState(() {
+                          riskData = {
+                            'level': riskCheck['risk_level'],
+                            'score': riskCheck['risk_score'].toStringAsFixed(2),
+                            'reason': riskCheck['warnings'].isEmpty
+                                ? 'Normal transaction'
+                                : riskCheck['warnings'][0],
+                          };
+                          feeData = {
+                            'vat': data['fee'] ?? 0,
+                            'fee': 0,
+                            'total': data['total_deducted'],
+                          };
+                        });
+
+                        // Check if can proceed
+                        if (!riskCheck['can_proceed']) {
+                          if (mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                title: const Text(
+                                  'Transaction Blocked',
+                                  style: TextStyle(
+                                    fontFamily: 'InstrumentSans',
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                content: Text(
+                                  riskCheck['warnings'].join('\n'),
+                                  style: const TextStyle(
+                                    fontFamily: 'InstrumentSans',
+                                  ),
+                                ),
+                                actions: [
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2196F3),
+                                    ),
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text(
+                                      'OK',
+                                      style: TextStyle(fontFamily: 'InstrumentSans'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // If high risk, ask user to confirm
+                        if (riskCheck['risk_level'] == 'high') {
+                          final ok = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              title: const Text(
+                                'High Risk Detected',
+                                style: TextStyle(
+                                  fontFamily: 'InstrumentSans',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              content: Text(
+                                riskCheck['warnings'].join('\n'),
+                                style: const TextStyle(
+                                  fontFamily: 'InstrumentSans',
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      fontFamily: 'InstrumentSans',
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2196F3),
+                                  ),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text(
+                                    'Proceed',
+                                    style: TextStyle(fontFamily: 'InstrumentSans'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (ok != true) return;
+                        }
+
+                        // Navigate to confirmation screen with preview data
+                        if (mounted) {
+                          context.push(
+                            '/send/confirm',
+                            extra: {
+                              'phone': _sanitizePhone(_phoneController.text),
+                              'amount': _parseAmount(_amountController.text).toStringAsFixed(0),
+                              'receiverName': data['receiver_name'],
+                              'fees': feeData,
+                              'risk': riskData,
+                              'previewData': _previewData,
+                            },
+                          );
+                        }
+                      } else if (response.statusCode == 404) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Receiver not found'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } else if (response.statusCode == 400) {
+                        final error = jsonDecode(response.body);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error['detail'] ?? 'Invalid request'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to preview transaction'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: ${e.toString()}'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => _isLoading = false);
+                      }
+                    }
+                  }
+                      : null,
+                  child: _isLoading
+                      ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                      : const Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontFamily: 'InstrumentSans',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Quick Amount Button Widget
+class _QuickAmountButton extends StatelessWidget {
+  final String amount;
+  final VoidCallback onTap;
+  const _QuickAmountButton({required this.amount, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+        ),
+        child: Text(
+          amount,
+          style: const TextStyle(
+            fontFamily: 'InstrumentSans',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF2196F3),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Fee Row Widget
+class _FeeRow extends StatelessWidget {
+  final String label;
+  final String amount;
+  final bool isBold;
+  const _FeeRow({
+    required this.label,
+    required this.amount,
+    this.isBold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'InstrumentSans',
+            fontSize: isBold ? 16 : 14,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+            color: const Color(0xFF626C7A),
+          ),
+        ),
+        Text(
+          amount,
+          style: TextStyle(
+            fontFamily: 'InstrumentSans',
+            fontSize: isBold ? 18 : 16,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w700,
+            color: const Color(0xFF1E1E1E),
+          ),
+        ),
+      ],
+    );
+  }
+}
