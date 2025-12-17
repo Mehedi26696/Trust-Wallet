@@ -4,6 +4,7 @@ import 'package:trustwallet_frontend/src/features/auth/onboarding_screen.dart';
 import 'package:trustwallet_frontend/src/features/auth/signin_screen.dart';
 import 'package:trustwallet_frontend/src/features/auth/signup_screen.dart';
 import 'package:trustwallet_frontend/src/features/auth/splash_screen.dart';
+import '../features/auth/forget_password_screen.dart';
 import 'package:trustwallet_frontend/src/features/merchant/pay_confirm_screen.dart';
 import '../features/dashboard/home_screen.dart';
 import '../features/send/send_entry_screen.dart';
@@ -16,6 +17,7 @@ import '../features/merchant/merchant_profile_screen.dart';
 import '../features/offers/top_shops_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/profile/profile_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -28,8 +30,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/signin', builder: (_, __) => const SignInScreen()),
       GoRoute(path: '/signup', builder: (_, __) => const SignUpScreen()),
+      GoRoute(path: '/forgot-password', builder: (_, __) => const ForgetPasswordScreen()),
 
       GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+      GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/send', builder: (_, __) => const SendEntryScreen()),
       GoRoute(
         path: '/send/confirm',
@@ -50,9 +54,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/merchant',
         builder: (_, __) => const MerchantProfileScreen(),
       ),
-      /*GoRoute(path: '/offers', builder: (_, __) => const TopShopsScreen()),
+      // GoRoute(path: '/offers', builder: (_, __) => const TopShopsScreen()),
       GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),*/
+      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
     ],
   );
 });

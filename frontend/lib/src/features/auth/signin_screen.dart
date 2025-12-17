@@ -33,24 +33,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
-      appBar: AppBar(
-        backgroundColor: Color.fromARGB(255, 2, 101, 250),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/onboarding'),
-        ),
-        title: const Text(
-          'Sign In',
-          style: TextStyle(
-            fontFamily: 'InstrumentSans',
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color.fromARGB(255, 245, 245, 245),
-            letterSpacing: -0.1,
-          ),
-        ),
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -234,6 +216,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                         onPressed: () async {
                           if (_formKey.currentState!.validate()) {
+                            final messenger = ScaffoldMessenger.of(context);
                             try {
                               final uri = Uri.parse(login_endpoint);
                               final res = await http.post(
@@ -254,7 +237,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                                 if (_accessToken == null) {
                                   if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  messenger.showSnackBar(
                                     const SnackBar(
                                       content: Text('Invalid server response.'),
                                     ),
@@ -266,7 +249,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 context.go('/home');
                               } else {
                                 if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messenger.showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       'Login failed (${res.statusCode}). Check your credentials.',
@@ -276,7 +259,7 @@ class _SignInScreenState extends State<SignInScreen> {
                               }
                             } catch (e) {
                               if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              messenger.showSnackBar(
                                 const SnackBar(
                                   content: Text(
                                     'Network error. Please try again.',

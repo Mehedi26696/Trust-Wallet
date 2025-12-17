@@ -16,7 +16,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
   final fs = FeeService();
   final rs = RiskService();
   final bdt = NumberFormat.currency(
-    locale: 'bn_BD',
+    locale: 'en_US',
     symbol: '৳',
     decimalDigits: 0,
   );

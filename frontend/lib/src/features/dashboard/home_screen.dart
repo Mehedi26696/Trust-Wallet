@@ -217,17 +217,21 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [kPrimary, kPrimaryDark],
+              InkWell(
+                onTap: () => context.go('/profile'),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [kPrimary, kPrimaryDark],
+                    ),
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
-                  border: Border.all(color: Colors.white, width: 2),
+                  child: const Icon(Icons.person, color: Colors.white, size: 20),
                 ),
-                child: const Icon(Icons.person, color: Colors.white, size: 20),
               ),
             ],
           ),
