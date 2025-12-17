@@ -30,6 +30,8 @@ from ..services.wallet_service import WalletService
 from ..services.user_service import UserService
 from ..utils.database import get_session
 from ..utils.xgboost_fraud_detector import xgboost_fraud_check
+from ..utils.fraud_detector import check_fraudulent_activity
+from ..utils.groq_message_enhancer import enhance_risk_message
 from ..config import settings
 from ..schemas.anomaly_schemas import RawTransaction, RawPredictionResponse
 from datetime import datetime
@@ -265,6 +267,11 @@ async def check_transaction_risk(
                 detail="Cannot send money to yourself"
             )
         
+        # Rule-based check (always execute)
+        rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
+            session, current_user.id, float(risk_request.amount)
+        )
+
         # Run XGBoost fraud check
         is_fraud, fraud_prob, details = xgboost_fraud_check(
             session,
@@ -273,7 +280,69 @@ async def check_transaction_risk(
             float(risk_request.amount),
             transaction_type="TRANSFER"
         )
-        
+
+        warnings = []
+
+        # If rule-based flagged, set high risk and block (can_proceed=False)
+        if rule_flagged:
+            # Map severity to risk score with more granular levels
+            severity_scores = {
+                "critical": 0.98,
+                "high": 0.90,
+                "medium-high": 0.80,
+                "medium": 0.70,
+                "medium-low": 0.55,
+                "low": 0.35
+            }
+            rule_score = severity_scores.get(rule_severity, 0.85)
+            # Only block for medium and above; allow low severity with warning
+            can_proceed = rule_severity == "low"
+            
+            # Enhance message with Groq if available
+            enhanced_reason = await enhance_risk_message(
+                risk_level="high" if rule_severity != "low" else "medium",
+                severity=rule_severity,
+                original_reason=rule_reason,
+                amount=float(risk_request.amount),
+                risk_score=rule_score,
+            )
+            warnings.append(enhanced_reason)
+            
+            return RiskCheckResponse(
+                risk_level="high" if rule_severity != "low" else "medium",
+                risk_score=rule_score,
+                threshold=0.5,
+                can_proceed=can_proceed,
+                warnings=warnings,
+                details={"rule": rule_reason, "severity": rule_severity, "model": details},
+            )
+
+        # If model failed internally and returned fail-open defaults, use a heuristic fallback
+        if isinstance(details, dict) and ("error" in details):
+            amt = float(risk_request.amount)
+            # Heuristic based on configured thresholds
+            if amt >= settings.HIGH_VALUE_THRESHOLD:
+                fraud_prob = 0.85
+                risk_level = "high"
+                warnings.append("ML unavailable; heuristic high risk by amount")
+            elif amt >= settings.HIGH_VALUE_THRESHOLD * 0.6:
+                fraud_prob = 0.55
+                risk_level = "medium"
+                warnings.append("ML unavailable; heuristic medium risk by amount")
+            else:
+                fraud_prob = 0.15
+                risk_level = "low"
+                warnings.append("ML unavailable; heuristic low risk")
+            can_proceed = True
+            return RiskCheckResponse(
+                risk_level=risk_level,
+                risk_score=fraud_prob,
+                threshold=0.5,
+                can_proceed=can_proceed,
+                warnings=warnings,
+                details=details,
+            )
+
         # Determine risk level based on fraud probability
         if fraud_prob < 0.3:
             risk_level = "low"
@@ -281,19 +350,18 @@ async def check_transaction_risk(
             risk_level = "medium"
         else:
             risk_level = "high"
-        
-        # Build warnings list
-        warnings = []
+
+        # Build warnings list from model output
         if is_fraud:
             warnings.append("Transaction flagged as potentially fraudulent")
         if fraud_prob > 0.7:
             warnings.append("High fraud risk detected")
         elif fraud_prob > 0.5:
             warnings.append("Moderate fraud risk detected")
-        
+
         # Determine if transaction can proceed
         can_proceed = not is_fraud or not settings.BLOCK_ML_ANOMALY
-        
+
         return RiskCheckResponse(
             risk_level=risk_level,
             risk_score=fraud_prob,
@@ -369,6 +437,11 @@ async def preview_transaction(
                 detail="Insufficient balance"
             )
         
+        # Rule-based check (always execute)
+        rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
+            session, current_user.id, float(preview_request.amount)
+        )
+
         # Run XGBoost fraud check
         is_fraud, fraud_prob, details = xgboost_fraud_check(
             session,
@@ -377,7 +450,59 @@ async def preview_transaction(
             float(preview_request.amount),
             transaction_type="TRANSFER"
         )
-        
+
+        warnings = []
+
+        # If rule-based flagged, force high risk and disallow proceed
+        if rule_flagged:
+            # Map severity to risk score with more granular levels
+            severity_scores = {
+                "critical": 0.98,
+                "high": 0.90,
+                "medium-high": 0.80,
+                "medium": 0.70,
+                "medium-low": 0.55,
+                "low": 0.35
+            }
+            rule_score = severity_scores.get(rule_severity, 0.85)
+            # Only block for medium and above; allow low severity with warning
+            can_proceed = rule_severity == "low"
+            
+            # Enhance message with Groq if available
+            enhanced_reason = await enhance_risk_message(
+                risk_level="high" if rule_severity != "low" else "medium",
+                severity=rule_severity,
+                original_reason=rule_reason,
+                amount=float(preview_request.amount),
+                risk_score=rule_score,
+            )
+            warnings.append(enhanced_reason)
+            
+            risk_check = RiskCheckResponse(
+                risk_level="high" if rule_severity != "low" else "medium",
+                risk_score=rule_score,
+                threshold=0.5,
+                can_proceed=can_proceed,
+                warnings=warnings,
+                details={"rule": rule_reason, "severity": rule_severity, "model": details},
+            )
+            # Even when flagged, show accurate fee/VAT so the UI reflects costs
+            flagged_fee = round(float(preview_request.amount) * (10 / 1000), 2)
+            flagged_vat = round(float(preview_request.amount) * (5 / 1000), 2)
+            flagged_total = float(preview_request.amount) + flagged_fee + flagged_vat
+            return TransactionPreviewResponse(
+                sender_balance=current_user.wallet_balance,
+                receiver_name=receiver.full_name,
+                receiver_phone=receiver.phone_number or preview_request.receiver_phone,
+                amount=preview_request.amount,
+                fee=flagged_fee,
+                vat=flagged_vat,
+                total_deducted=flagged_total,
+                new_balance=current_user.wallet_balance - flagged_total,
+                risk_check=risk_check,
+                can_proceed=False,
+            )
+
         # Determine risk level based on fraud probability
         # Low: < 30%, Medium: 30-70%, High: > 70%
         if fraud_prob < 0.3:
@@ -388,7 +513,6 @@ async def preview_transaction(
             risk_level = "high"
         
         # Build warnings
-        warnings = []
         if is_fraud:
             warnings.append("Transaction flagged as potentially fraudulent")
         if fraud_prob > 0.7:
@@ -399,9 +523,10 @@ async def preview_transaction(
         # Determine if can proceed
         can_proceed = not is_fraud or not settings.BLOCK_ML_ANOMALY
         
-        # Calculate fees (currently 0, but structured for future)
-        fee = 0.0
-        total_deducted = preview_request.amount + fee
+        # Calculate fees: ৳10/1000 fee and ৳5/1000 VAT
+        fee = round(float(preview_request.amount) * (10 / 1000), 2)
+        vat = round(float(preview_request.amount) * (5 / 1000), 2)
+        total_deducted = float(preview_request.amount) + fee + vat
         new_balance = current_user.wallet_balance - total_deducted
         
         # Build risk check response
@@ -420,6 +545,7 @@ async def preview_transaction(
             receiver_phone=receiver.phone_number or preview_request.receiver_phone,
             amount=preview_request.amount,
             fee=fee,
+            vat=vat,
             total_deducted=total_deducted,
             new_balance=new_balance,
             risk_check=risk_check,
@@ -460,6 +586,44 @@ async def confirm_transaction(
             amount=confirm_request.amount
         )
         
+        # Rule-based pre-check
+        rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
+            session, current_user.id, float(send_request.amount)
+        )
+        if rule_flagged:
+            # Map severity to risk score with more granular levels
+            severity_scores = {
+                "critical": 0.98,
+                "high": 0.90,
+                "medium-high": 0.80,
+                "medium": 0.70,
+                "medium-low": 0.55,
+                "low": 0.35
+            }
+            rule_score = severity_scores.get(rule_severity, 0.85)
+            # Only block for medium and above
+            if rule_severity != "low":
+                # Enhance message with Groq if available
+                enhanced_reason = await enhance_risk_message(
+                    risk_level="high",
+                    severity=rule_severity,
+                    original_reason=rule_reason,
+                    amount=float(send_request.amount),
+                    risk_score=rule_score,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "warning": {
+                            "flagged": True,
+                            "reason": enhanced_reason,
+                            "fraud_probability": rule_score,
+                            "threshold": 0.5,
+                            "details": {"rule": rule_reason, "severity": rule_severity},
+                        }
+                    },
+                )
+
         # Find receiver by phone
         receiver = UserService.get_user_by_phone(session, send_request.receiver_phone)
         receiver_id = receiver.id if receiver else None
@@ -538,6 +702,44 @@ async def send_money(
     If ML detects an anomaly and BLOCK_ML_ANOMALY is false, returns the transaction with a warning payload.
     """
     try:
+        # Rule-based pre-check
+        rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
+            session, current_user.id, float(send_request.amount)
+        )
+        if rule_flagged:
+            # Map severity to risk score with more granular levels
+            severity_scores = {
+                "critical": 0.98,
+                "high": 0.90,
+                "medium-high": 0.80,
+                "medium": 0.70,
+                "medium-low": 0.55,
+                "low": 0.35
+            }
+            rule_score = severity_scores.get(rule_severity, 0.85)
+            # Only block for medium and above
+            if rule_severity != "low":
+                # Enhance message with Groq if available
+                enhanced_reason = await enhance_risk_message(
+                    risk_level="high",
+                    severity=rule_severity,
+                    original_reason=rule_reason,
+                    amount=float(send_request.amount),
+                    risk_score=rule_score,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "warning": {
+                            "flagged": True,
+                            "reason": enhanced_reason,
+                            "fraud_probability": rule_score,
+                            "threshold": 0.5,
+                            "details": {"rule": rule_reason, "severity": rule_severity},
+                        }
+                    },
+                )
+
         # XGBoost ML pre-check (fails open if artifacts missing)
         receiver = UserService.get_user_by_phone(session, send_request.receiver_phone)
         receiver_id = receiver.id if receiver else None

@@ -14,9 +14,21 @@ from ..schemas.wallet_schemas import WalletSendRequest
 from ..services.user_service import UserService
 from ..utils.fraud_detector import check_fraudulent_activity, is_user_blocked
 
+# Fee structure: ৳10 per ৳1000 (1%) transaction fee and ৳5 per ৳1000 (0.5%) VAT
+FEE_RATE = 10 / 1000
+VAT_RATE = 5 / 1000
+
 
 class WalletService:
     """Service class for wallet operations."""
+
+    @staticmethod
+    def calculate_charges(amount: float) -> tuple[float, float, float]:
+        """Return (fee, vat, total_deducted) based on configured rates."""
+        fee = round(amount * FEE_RATE, 2)
+        vat = round(amount * VAT_RATE, 2)
+        total_deducted = round(amount + fee + vat, 2)
+        return fee, vat, total_deducted
     
     @staticmethod
     def get_balance(user: User) -> float:
@@ -80,8 +92,12 @@ class WalletService:
                 detail="Cannot send money to yourself"
             )
         
-        # Check sender balance
-        if sender.wallet_balance < send_request.amount:
+        fee, vat, total_deducted = WalletService.calculate_charges(
+            send_request.amount
+        )
+
+        # Check sender balance including fees and VAT
+        if sender.wallet_balance < total_deducted:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Insufficient balance"
@@ -100,8 +116,8 @@ class WalletService:
         
         # Perform transaction
         try:
-            # Deduct from sender
-            sender.wallet_balance -= send_request.amount
+            # Deduct from sender (amount + fee + VAT)
+            sender.wallet_balance -= total_deducted
             session.add(sender)
             
             # Add to receiver

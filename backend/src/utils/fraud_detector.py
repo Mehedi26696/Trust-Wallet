@@ -131,53 +131,136 @@ def autoencoder_fraud_check(
         return False, 0.0, {"ml_error": str(e)}
 
 
-def check_fraudulent_activity(session: Session, user_id: UUID, amount: float) -> Tuple[bool, str]:
+def check_fraudulent_activity(session: Session, user_id: UUID, amount: float, receiver_id: Optional[UUID] = None) -> Tuple[bool, str, str]:
     """
     Check if a transaction should be flagged as fraudulent.
     
-    Fraud detection rules:
-    1. Transaction amount > MAX_TRANSACTION_AMOUNT BDT = suspicious
-    2. More than MAX_HIGH_VALUE_TRANSACTIONS high-value (>=HIGH_VALUE_THRESHOLD) 
-       transactions within HIGH_VALUE_TIME_WINDOW_MINUTES minutes = flag user
+    Fraud detection rules with severity levels:
+    - critical (0.98): Multiple high-value in short time
+    - high (0.90): Exceeds max amount, 2x historical max
+    - medium-high (0.80): Rapid successive transactions, testing pattern
+    - medium (0.70): Amount > average, first-time high-value receiver
+    - low (0.35): Late night, weekend high-value
     
     Args:
         session: Database session
         user_id (UUID): User ID making the transaction
         amount (float): Transaction amount in BDT
+        receiver_id (Optional[UUID]): Receiver user ID for additional checks
         
     Returns:
-        Tuple[bool, str]: (is_fraudulent, reason)
+        Tuple[bool, str, str]: (is_fraudulent, reason, severity)
     """
     
-    # Rule 1: High-value transaction check
-    if amount > settings.MAX_TRANSACTION_AMOUNT:
-        reason = f"High-value transaction of {amount:,.2f} BDT exceeds {settings.MAX_TRANSACTION_AMOUNT:,.2f} BDT limit"
-        _create_fraud_alert(session, user_id, reason, "high")
-        return True, reason
+    # Fetch user's transaction history for multiple rules
+    time_30d_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    recent_stmt = select(Transaction).where(
+        Transaction.sender_id == user_id,
+        Transaction.status == "completed",
+        Transaction.timestamp >= time_30d_ago,
+    ).order_by(Transaction.timestamp.desc())
+    recent_txns = list(session.exec(recent_stmt))
     
-    # Rule 2: Multiple high-value transactions in short time
+    # Rule 1: Absolute maximum transaction amount (high severity)
+    if amount > settings.MAX_TRANSACTION_AMOUNT:
+        reason = f"Transaction amount {amount:,.2f} BDT exceeds maximum limit {settings.MAX_TRANSACTION_AMOUNT:,.2f} BDT"
+        _create_fraud_alert(session, user_id, reason, "high")
+        return True, reason, "high"
+
+    # Rule 2: Amount exceeds 2x historical maximum (high severity)
+    if recent_txns:
+        amounts = [float(t.amount) for t in recent_txns if t.amount is not None]
+        if amounts:
+            max_historical = max(amounts)
+            if amount > max_historical * 2:
+                reason = f"Transaction amount {amount:,.2f} BDT is more than 2x your historical maximum {max_historical:,.2f} BDT"
+                _create_fraud_alert(session, user_id, reason, "high")
+                return True, reason, "high"
+    
+    # Rule 3: Amount above recent average (medium severity)
+    if recent_txns:
+        amounts = [float(t.amount) for t in recent_txns if t.amount is not None]
+        if amounts:
+            avg_amount = sum(amounts) / len(amounts)
+            if avg_amount > 0 and amount > avg_amount * 1.5:
+                reason = f"Transaction amount {amount:,.2f} BDT significantly exceeds recent average {avg_amount:,.2f} BDT"
+                _create_fraud_alert(session, user_id, reason, "medium")
+                return True, reason, "medium"
+    
+    # Rule 4: Multiple high-value transactions in short time (critical severity)
     if amount >= settings.HIGH_VALUE_THRESHOLD:
-        # Check transactions in configured time window
         time_window_ago = datetime.now(timezone.utc) - timedelta(minutes=settings.HIGH_VALUE_TIME_WINDOW_MINUTES)
-        
-        statement = select(Transaction).where(
+        high_value_stmt = select(Transaction).where(
             Transaction.sender_id == user_id,
             Transaction.timestamp >= time_window_ago,
             Transaction.amount >= settings.HIGH_VALUE_THRESHOLD,
             Transaction.status == "completed"
         )
+        recent_high_value = list(session.exec(high_value_stmt))
         
-        recent_high_value_transactions = session.exec(statement).all()
-        
-        # If this would exceed the maximum allowed high-value transactions
-        if len(recent_high_value_transactions) >= settings.MAX_HIGH_VALUE_TRANSACTIONS:
-            reason = f"Multiple high-value transactions detected: {len(recent_high_value_transactions) + 1} transactions >={settings.HIGH_VALUE_THRESHOLD:,.2f} BDT in {settings.HIGH_VALUE_TIME_WINDOW_MINUTES} minutes"
+        if len(recent_high_value) >= settings.MAX_HIGH_VALUE_TRANSACTIONS:
+            reason = f"Multiple high-value transactions: {len(recent_high_value) + 1} transactions ≥{settings.HIGH_VALUE_THRESHOLD:,.2f} BDT in {settings.HIGH_VALUE_TIME_WINDOW_MINUTES} minutes"
             _create_fraud_alert(session, user_id, reason, "critical")
-            return True, reason
+            return True, reason, "critical"
     
-    # Additional rules can be added here
+    # Rule 5: Rapid successive transactions - velocity check (medium-high severity)
+    time_5min_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+    velocity_stmt = select(Transaction).where(
+        Transaction.sender_id == user_id,
+        Transaction.timestamp >= time_5min_ago,
+        Transaction.status == "completed"
+    )
+    recent_velocity = list(session.exec(velocity_stmt))
+    if len(recent_velocity) >= 3:
+        reason = f"Rapid transaction velocity: {len(recent_velocity) + 1} transactions in 5 minutes"
+        _create_fraud_alert(session, user_id, reason, "medium-high")
+        return True, reason, "medium-high"
     
-    return False, ""
+    # Rule 6: First transaction to receiver with high amount (medium severity)
+    if receiver_id and amount >= settings.HIGH_VALUE_THRESHOLD * 0.5:
+        receiver_stmt = select(Transaction).where(
+            Transaction.sender_id == user_id,
+            Transaction.receiver_id == receiver_id,
+            Transaction.status == "completed"
+        )
+        receiver_history = list(session.exec(receiver_stmt))
+        if len(receiver_history) == 0:
+            reason = f"First transaction to new receiver with amount {amount:,.2f} BDT"
+            _create_fraud_alert(session, user_id, reason, "medium")
+            return True, reason, "medium"
+    
+    # Rule 7: Testing pattern - small amount followed by large (medium-high severity)
+    time_1hr_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    recent_1hr_stmt = select(Transaction).where(
+        Transaction.sender_id == user_id,
+        Transaction.timestamp >= time_1hr_ago,
+        Transaction.status == "completed"
+    ).order_by(Transaction.timestamp.desc())
+    recent_1hr = list(session.exec(recent_1hr_stmt))
+    
+    if recent_1hr and amount >= settings.HIGH_VALUE_THRESHOLD:
+        recent_amounts = [float(t.amount) for t in recent_1hr if t.amount is not None]
+        # Check if any recent transaction was very small (<100 BDT) followed by this large one
+        if any(amt < 100 for amt in recent_amounts[:3]):
+            reason = f"Suspicious pattern: Small test transaction followed by large amount {amount:,.2f} BDT"
+            _create_fraud_alert(session, user_id, reason, "medium-high")
+            return True, reason, "medium-high"
+    
+    # Rule 8: Late night transaction (low severity - warning only)
+    current_hour = datetime.now(timezone.utc).hour
+    if (current_hour >= 22 or current_hour <= 6) and amount >= settings.HIGH_VALUE_THRESHOLD:
+        reason = f"High-value transaction {amount:,.2f} BDT during late night hours (22:00-06:00)"
+        _create_fraud_alert(session, user_id, reason, "low")
+        return True, reason, "low"
+    
+    # Rule 9: Weekend high-value transaction (low severity - warning only)
+    current_weekday = datetime.now(timezone.utc).weekday()
+    if current_weekday >= 5 and amount >= settings.HIGH_VALUE_THRESHOLD * 1.5:
+        reason = f"High-value weekend transaction {amount:,.2f} BDT"
+        _create_fraud_alert(session, user_id, reason, "low")
+        return True, reason, "low"
+    
+    return False, "", ""
 
 
 def _create_fraud_alert(session: Session, user_id: UUID, reason: str, severity: str = "medium") -> None:

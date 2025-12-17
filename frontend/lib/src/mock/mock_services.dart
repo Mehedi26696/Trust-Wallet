@@ -12,8 +12,12 @@ class RiskService {
 
 class FeeService {
   Map<String, num> quote(num amount) {
-    final vat = (amount * 0.015).roundToDouble();
-    final fee = (amount * 0.01).roundToDouble();
+    // Rates: ৳10 per ৳1000 for transaction fee (1%) and ৳5 per ৳1000 for VAT (0.5%)
+    const feeRate = 10 / 1000;
+    const vatRate = 5 / 1000;
+
+    final fee = (amount * feeRate).roundToDouble();
+    final vat = (amount * vatRate).roundToDouble();
     return {'vat': vat, 'fee': fee, 'total': amount + vat + fee};
   }
 }

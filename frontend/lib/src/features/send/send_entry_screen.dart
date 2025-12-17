@@ -38,6 +38,7 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
     'score': 12,
     'reason': 'Normal transaction',
   };
+  bool _riskVisible = false;
 
   Map<String, num> feeData = const {'vat': 0, 'fee': 0, 'total': 0};
 
@@ -51,7 +52,7 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
   // --- Helpers ---
   void _triggerRecalc() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 180), _recalculate);
+    _debounce = Timer(const Duration(milliseconds: 600), _recalculate);
   }
 
   void _recalculate() {
@@ -66,9 +67,66 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
       );
     }
 
+    // Always update fees locally
     setState(() {
-      riskData = risk.score(_sanitizePhone(_phoneController.text), clamped);
       feeData = fees.quote(clamped);
+    });
+
+    // Only hit backend when inputs are valid and user paused typing
+    if (!_isPhoneValid || !_isAmountValid) {
+      setState(() {
+        riskData = {
+          'level': 'low',
+          'score': 0,
+          'reason': 'Enter receiver and amount',
+        };
+        _riskVisible = false;
+      });
+      return;
+    }
+
+    // Fetch risk from backend; fallback to mock on error
+    _fetchRiskFromBackend(_sanitizePhone(_phoneController.text), clamped);
+  }
+
+  Future<void> _fetchRiskFromBackend(String phone, num amount) async {
+    try {
+      final resp = await http.post(
+        Uri.parse(check_risk_endpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          if (authToken != null) 'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({'receiver_phone': phone, 'amount': amount}),
+      );
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final level = (data['risk_level'] ?? 'low') as String;
+        final score01 = (data['risk_score'] ?? 0.0) as num; // 0..1
+        final warnings =
+            (data['warnings'] as List?)?.cast<dynamic>() ?? const [];
+        final reason = warnings.isNotEmpty
+            ? warnings.first.toString()
+            : (level == 'high' ? 'High fraud risk detected' : 'Normal');
+
+        setState(() {
+          riskData = {
+            'level': level,
+            'score': (score01 * 100).toStringAsFixed(1), // Show one decimal
+            'reason': reason,
+          };
+        });
+        return;
+      }
+    } catch (_) {
+      // ignore, will fallback
+    }
+
+    // Fallback to local mock if backend unavailable
+    setState(() {
+      riskData = risk.score(phone, amount);
+      _riskVisible = false;
     });
   }
 
@@ -460,39 +518,41 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
               ),
               const SizedBox(height: 24),
 
-              // --- Risk Banner (always visible, level-colored) ---
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _riskBg(riskData['level'] as String),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _riskColor(riskData['level'] as String),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.security,
+              // --- Risk Banner (only after user presses Continue) ---
+              if (_riskVisible) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _riskBg(riskData['level'] as String),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
                       color: _riskColor(riskData['level'] as String),
-                      size: 20,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${riskData['reason']} — (${riskData['score']})',
-                        style: TextStyle(
-                          fontFamily: 'InstrumentSans',
-                          fontSize: 12,
-                          color: _riskColor(riskData['level'] as String),
-                          fontWeight: FontWeight.w600,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.security,
+                        color: _riskColor(riskData['level'] as String),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${riskData['reason']} — (${riskData['score']})',
+                          style: TextStyle(
+                            fontFamily: 'InstrumentSans',
+                            fontSize: 12,
+                            color: _riskColor(riskData['level'] as String),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
 
               // --- Fee Summary ---
               Container(
@@ -528,7 +588,8 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: (_isPhoneValid && _isAmountValid && !_isLoading)
+                    backgroundColor:
+                        (_isPhoneValid && _isAmountValid && !_isLoading)
                         ? const Color(0xFF2196F3)
                         : Colors.grey,
                     elevation: 0,
@@ -539,211 +600,241 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
                   ),
                   onPressed: (_isPhoneValid && _isAmountValid && !_isLoading)
                       ? () async {
-                    // Call backend preview API
-                    setState(() => _isLoading = true);
+                          // Call backend preview API
+                          setState(() => _isLoading = true);
 
-                    try {
-                      final response = await http.post(
-                        Uri.parse(preview_send_endpoint),
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': 'Bearer $authToken',
-                        },
-                        body: jsonEncode({
-                          'receiver_phone': _sanitizePhone(_phoneController.text),
-                          'amount': _parseAmount(_amountController.text).toDouble(),
-                        }),
-                      );
+                          try {
+                            final amountValue = _parseAmount(
+                              _amountController.text,
+                            ).toDouble();
 
-                      if (!mounted) return;
-
-                      if (response.statusCode == 200) {
-                        final data = jsonDecode(response.body);
-                        _previewData = data;
-
-                        // Update risk data from backend
-                        final riskCheck = data['risk_check'];
-                        setState(() {
-                          riskData = {
-                            'level': riskCheck['risk_level'],
-                            'score': riskCheck['risk_score'].toStringAsFixed(2),
-                            'reason': riskCheck['warnings'].isEmpty
-                                ? 'Normal transaction'
-                                : riskCheck['warnings'][0],
-                          };
-                          feeData = {
-                            'vat': data['fee'] ?? 0,
-                            'fee': 0,
-                            'total': data['total_deducted'],
-                          };
-                        });
-
-                        // Check if can proceed
-                        if (!riskCheck['can_proceed']) {
-                          if (mounted) {
-                            showDialog(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                            final response = await http.post(
+                              Uri.parse(preview_send_endpoint),
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer $authToken',
+                              },
+                              body: jsonEncode({
+                                'receiver_phone': _sanitizePhone(
+                                  _phoneController.text,
                                 ),
-                                title: const Text(
-                                  'Transaction Blocked',
-                                  style: TextStyle(
-                                    fontFamily: 'InstrumentSans',
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                content: Text(
-                                  riskCheck['warnings'].join('\n'),
-                                  style: const TextStyle(
-                                    fontFamily: 'InstrumentSans',
-                                  ),
-                                ),
-                                actions: [
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2196F3),
-                                    ),
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text(
-                                      'OK',
-                                      style: TextStyle(fontFamily: 'InstrumentSans'),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                'amount': amountValue,
+                              }),
                             );
-                          }
-                          return;
-                        }
 
-                        // If high risk, ask user to confirm
-                        if (riskCheck['risk_level'] == 'high') {
-                          final ok = await showDialog<bool>(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              title: const Text(
-                                'High Risk Detected',
-                                style: TextStyle(
-                                  fontFamily: 'InstrumentSans',
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              content: Text(
-                                riskCheck['warnings'].join('\n'),
-                                style: const TextStyle(
-                                  fontFamily: 'InstrumentSans',
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
-                                  child: const Text(
-                                    'Cancel',
-                                    style: TextStyle(
-                                      fontFamily: 'InstrumentSans',
-                                      color: Colors.grey,
+                            if (!mounted) return;
+
+                            if (response.statusCode == 200) {
+                              final data = jsonDecode(response.body);
+                              _previewData = data;
+
+                              // Update risk data from backend
+                              final riskCheck = data['risk_check'];
+                              final riskScore =
+                                  (riskCheck['risk_score'] ?? 0.0) as num;
+
+                              final backendFee = (data['fee'] as num?) ?? 0;
+                              final backendVat = (data['vat'] as num?) ?? 0;
+                              final backendTotal =
+                                  (data['total_deducted'] as num?) ??
+                                  (amountValue + backendFee + backendVat);
+                              setState(() {
+                                riskData = {
+                                  'level': riskCheck['risk_level'],
+                                  'score': (riskScore * 100).toStringAsFixed(1),
+                                  'reason': riskCheck['warnings'].isEmpty
+                                      ? 'Normal transaction'
+                                      : riskCheck['warnings'][0],
+                                };
+                                feeData = {
+                                  'vat': backendVat,
+                                  'fee': backendFee,
+                                  'total': backendTotal,
+                                };
+                                _riskVisible =
+                                    true; // show banner only after continue
+                              });
+
+                              // If backend says cannot proceed, warn but still allow moving to confirm (server will enforce on final send)
+                              if (!riskCheck['can_proceed']) {
+                                if (mounted) {
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      title: const Text(
+                                        'Transaction Flagged',
+                                        style: TextStyle(
+                                          fontFamily: 'InstrumentSans',
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      content: Text(
+                                        riskCheck['warnings'].join('\n'),
+                                        style: const TextStyle(
+                                          fontFamily: 'InstrumentSans',
+                                        ),
+                                      ),
+                                      actions: [
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFF2196F3,
+                                            ),
+                                          ),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text(
+                                            'Review & Continue',
+                                            style: TextStyle(
+                                              fontFamily: 'InstrumentSans',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2196F3),
-                                  ),
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text(
-                                    'Proceed',
-                                    style: TextStyle(fontFamily: 'InstrumentSans'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (ok != true) return;
-                        }
+                                  );
+                                }
+                                // Continue to confirm screen; final send will be blocked if server enforces
+                              }
 
-                        // Navigate to confirmation screen with preview data
-                        if (mounted) {
-                          context.push(
-                            '/send/confirm',
-                            extra: {
-                              'phone': _sanitizePhone(_phoneController.text),
-                              'amount': _parseAmount(_amountController.text).toStringAsFixed(0),
-                              'receiverName': data['receiver_name'],
-                              'fees': feeData,
-                              'risk': riskData,
-                              'previewData': _previewData,
-                            },
-                          );
+                              // If high risk or medium risk with score > 50%, show warning
+                              final scorePercent = riskScore * 100;
+
+                              if (riskCheck['risk_level'] == 'high' ||
+                                  scorePercent > 50) {
+                                await showDialog<void>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: Text(
+                                      scorePercent > 50
+                                          ? 'Face Verification Required'
+                                          : 'High Risk Detected',
+                                      style: const TextStyle(
+                                        fontFamily: 'InstrumentSans',
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    content: Text(
+                                      scorePercent > 50
+                                          ? '${riskCheck['warnings'].join('\n')}\n\nYou will need to verify your face on the next screen to complete this transaction.'
+                                          : riskCheck['warnings'].join('\n'),
+                                      style: const TextStyle(
+                                        fontFamily: 'InstrumentSans',
+                                      ),
+                                    ),
+                                    actions: [
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF2196F3,
+                                          ),
+                                        ),
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text(
+                                          'Continue',
+                                          style: TextStyle(
+                                            fontFamily: 'InstrumentSans',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                // Do not block; continue to confirm where face verification is enforced
+                              }
+
+                              // Navigate to confirmation screen with preview data
+                              if (mounted) {
+                                context.push(
+                                  '/send/confirm',
+                                  extra: {
+                                    'phone': _sanitizePhone(
+                                      _phoneController.text,
+                                    ),
+                                    'amount': _parseAmount(
+                                      _amountController.text,
+                                    ).toStringAsFixed(0),
+                                    'receiverName': data['receiver_name'],
+                                    'fees': feeData,
+                                    'risk': riskData,
+                                    'previewData': _previewData,
+                                  },
+                                );
+                              }
+                            } else if (response.statusCode == 404) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Receiver not found'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } else if (response.statusCode == 400) {
+                              final error = jsonDecode(response.body);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      error['detail'] ?? 'Invalid request',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            } else {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Failed to preview transaction',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: ${e.toString()}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => _isLoading = false);
+                            }
+                          }
                         }
-                      } else if (response.statusCode == 404) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Receiver not found'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      } else if (response.statusCode == 400) {
-                        final error = jsonDecode(response.body);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(error['detail'] ?? 'Invalid request'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      } else {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to preview transaction'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: ${e.toString()}'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() => _isLoading = false);
-                      }
-                    }
-                  }
                       : null,
                   child: _isLoading
                       ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontFamily: 'InstrumentSans',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
+                          'Continue',
+                          style: TextStyle(
+                            fontFamily: 'InstrumentSans',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 20),

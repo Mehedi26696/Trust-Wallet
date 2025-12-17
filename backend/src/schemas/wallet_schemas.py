@@ -149,7 +149,8 @@ class TransactionPreviewResponse(BaseModel):
     receiver_name: str
     receiver_phone: str
     amount: float
-    fee: float = Field(default=0.0, description="Transaction fee (currently 0)")
+    fee: float = Field(default=0.0, description="Transaction fee (৳10 per ৳1000)")
+    vat: float = Field(default=0.0, description="Service VAT (৳5 per ৳1000)")
     total_deducted: float = Field(..., description="Total amount to be deducted from sender")
     new_balance: float = Field(..., description="Sender's balance after transaction")
     risk_check: RiskCheckResponse
@@ -162,9 +163,10 @@ class TransactionPreviewResponse(BaseModel):
                 "receiver_name": "John Doe",
                 "receiver_phone": "+8801712345678",
                 "amount": 1000.0,
-                "fee": 0.0,
-                "total_deducted": 1000.0,
-                "new_balance": 4000.0,
+                "fee": 10.0,
+                "vat": 5.0,
+                "total_deducted": 1015.0,
+                "new_balance": 3985.0,
                 "risk_check": {
                     "risk_level": "low",
                     "risk_score": 1.25,

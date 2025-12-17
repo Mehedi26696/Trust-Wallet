@@ -80,11 +80,12 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
     }
   }
 
-  // Simple anomaly rule for demo
-  bool _needsStepUp(String level, num amount) {
-    final h = DateTime.now().hour;
-    final lateNight = h <= 6 || h >= 23;
-    return level == 'high' || amount > 10000 || lateNight;
+  // Check if face verification required based on risk score
+  bool _needsStepUp(dynamic scoreStr) {
+    // Parse score string (could be "75.0" or "75" or number)
+    final scoreNum = num.tryParse(scoreStr.toString()) ?? 0;
+    // Require face verification if risk score > 50%
+    return scoreNum > 50;
   }
 
   Color _riskColor(String level) {
@@ -124,7 +125,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
     final fees = (data['fees'] as Map?) ?? {};
     final vat = (fees['vat'] ?? 0) as num;
     final fee = (fees['fee'] ?? 0) as num;
-    final total = (fees['total'] ?? amount) as num;
+    final total = (fees['total'] ?? (amount + fee + vat)) as num;
 
     final risk = (data['risk'] as Map?) ?? const {};
     final level = (risk['level'] ?? 'low') as String;
@@ -133,7 +134,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
 
     final previewData = data['previewData'] as Map<String, dynamic>?;
 
-    final needsStepUp = _needsStepUp(level, amount);
+    final needsStepUp = _needsStepUp(score);
     final now = DateTime.now();
     final timeFormat = DateFormat('hh:mm a');
 
@@ -400,7 +401,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Unusual activity detected. Please verify your face to continue.',
+                        'High risk detected ($score%). Verify your face to proceed.',
                         style: const TextStyle(color: Color(0xFFE65100)),
                       ),
                     ),
