@@ -31,6 +31,9 @@
 - [Database Schema](#-database-schema)
 - [Environment Configuration](#-environment-configuration)
 - [Testing](#-testing)
+- [Contributing](#-contributing)
+- [Reporting Bugs](#-reporting-bugs)
+- [License](#-license)
 
 ---
 
@@ -133,13 +136,7 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
   - Camera integration in Flutter app for seamless verification
   - Fallback mechanisms for camera unavailability
 
-### Admin Dashboard
 
-- Fraud alert management
-- User account management
-- Transaction monitoring
-- System health checks
-- Manual fund addition capabilities
 
 ### Mobile Features
 
@@ -1409,14 +1406,35 @@ flutter run --debug
 ```
 
 ---
+### Contributing
 
-## Support
+We welcome contributions to TrustWallet! To contribute, please follow these steps:
 
-### Getting Help
+1. **Fork the repository**  
+   Click the "Fork" button at the top-right of this page.
 
-- Email: support@trustwallet.example.com
-- GitHub Issues: [Create an issue](https://github.com/yourusername/TrustWallet/issues)
-- Documentation: [Wiki](https://github.com/yourusername/TrustWallet/wiki)
+2. **Clone your fork**  `
+   ```bash
+   https://github.com/Mehedi26696/Trust-Wallet.git
+   cd TrustWallet
+3.Create a branch for your feature or bugfix
+```
+git checkout -b feature/your-feature-name
+```
+4.Make Your Changes
+
+- Follow the existing code style to keep the project consistent.  
+- Add tests for any new features or bug fixes to ensure stability.  
+5. Commit and push your changes
+  ```
+  git add .
+  git commit -m "Add description of changes"
+  git push origin feature/your-feature-name
+  ```
+6. Open a Pull Request (PR)
+- Describe the problem and your solution clearly.
+- Reference any related issues with #issue_number.
+- Wait for review and feedback.
 
 ### Reporting Bugs
 
@@ -1429,26 +1447,19 @@ When reporting bugs, please include:
 5. Environment (OS, Python/Flutter version, etc.)
 
 ---
+## License
 
-## Acknowledgments
+This project is open source and licensed under the Apache License 2.0.
 
-- **FastAPI** - Modern Python web framework
-- **Flutter** - Beautiful cross-platform UI
-- **Supabase** - Open-source Firebase alternative
-- **XGBoost** - Gradient boosting framework
-- **scikit-learn** - Machine learning in Python
-- Bangladesh Government - NID format specifications
+Copyright © 2025 DU_Genmorphix
 
----
+You are free to use, modify, and distribute this software under the terms of the license.
 
-## Project Stats
 
-![GitHub stars](https://img.shields.io/github/stars/yourusername/TrustWallet?style=social)
-![GitHub forks](https://img.shields.io/github/forks/yourusername/TrustWallet?style=social)
-![GitHub issues](https://img.shields.io/github/issues/yourusername/TrustWallet)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/TrustWallet)
 
 ---
+
+
 
 <div align="center">
 
