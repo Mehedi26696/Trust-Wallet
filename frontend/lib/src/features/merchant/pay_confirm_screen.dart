@@ -13,7 +13,7 @@ class PayConfirmScreen extends StatefulWidget {
 
 class _PayConfirmScreenState extends State<PayConfirmScreen> {
   final _bdt = NumberFormat.currency(
-    locale: 'bn_BD',
+    locale: 'en_US',
     symbol: '৳',
     decimalDigits: 0,
   );

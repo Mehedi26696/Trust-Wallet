@@ -43,24 +43,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
-      appBar: AppBar(
-        backgroundColor: Color.fromARGB(255, 2, 101, 250),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/signin'),
-        ),
-        title: const Text(
-          'Sign Up',
-          style: TextStyle(
-            fontFamily: 'InstrumentSans',
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color.fromARGB(255, 245, 245, 245),
-            letterSpacing: -0.1,
-          ),
-        ),
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(

@@ -1,33 +1,33 @@
-# 🚀 TrustWallet MVP Backend
+# TrustWallet MVP Backend
 
 A production-grade FastAPI backend for a digital wallet application with NID verification and fraud detection, specifically designed for the Bangladesh market.
 
-## ✨ Features
+## Features
 
-### 🔐 User Management
+###  User Management
 - **Secure Registration**: Email-based registration with strong password requirements
 - **NID Validation**: Bangladesh National ID format validation (10, 13, 17 digits)
 - **JWT Authentication**: Secure token-based authentication
 - **Profile Management**: Complete user profile management
 
-### 💰 Wallet Operations  
+### Wallet Operations  
 - **Balance Management**: Real-time wallet balance tracking
 - **Money Transfers**: Secure peer-to-peer money transfers
 - **Transaction History**: Complete transaction logging and history
 
-### 🛡️ Fraud Detection
+### Fraud Detection
 - **Real-time Monitoring**: Automatic fraud detection during transactions
 - **High-value Transaction Alerts**: Transactions > 100,000 BDT flagged
 - **Velocity Checks**: Multiple high-value transactions in short time periods
 - **Admin Dashboard**: Fraud alert management for administrators
 
-### 🔒 Security Features
+### Security Features
 - **bcrypt Password Hashing**: Industry-standard password security
 - **JWT Token Authentication**: Secure API access
 - **Input Validation**: Comprehensive request validation
 - **Error Handling**: Clean error responses without stack traces
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **FastAPI**: Modern, fast web framework for building APIs
 - **SQLModel**: Type-safe SQL database interactions
@@ -38,12 +38,12 @@ A production-grade FastAPI backend for a digital wallet application with NID ver
 - **Python-Jose**: JWT token handling
 - **Uvicorn**: ASGI server for running the application
 
-## 📋 Prerequisites
+##  Prerequisites
 
 - Python 3.9+
 - pip (Python package manager)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Option A: With Supabase (Recommended)
 
@@ -89,7 +89,7 @@ The API will be available at:
 - **Interactive Docs**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
-## 📚 API Documentation
+## API Documentation
 
 ### Authentication Endpoints
 
@@ -218,7 +218,7 @@ POST /api/v1/admin/users/{user_id}/add-funds?amount=5000
 Authorization: Bearer <admin_jwt_token>
 ```
 
-## 🗃️ Database Schema
+## Database Schema
 
 ### Users Table
 - `id`: Primary key
@@ -247,7 +247,7 @@ Authorization: Bearer <admin_jwt_token>
 - `severity`: Alert severity level
 - `resolved`: Resolution status
 
-## 🔒 NID Validation Rules
+## NID Validation Rules
 
 ### Supported Formats
 - **10 digits**: Basic NID format
@@ -272,7 +272,7 @@ Invalid NIDs:
 - 12345abcde (contains non-digits)
 ```
 
-## 🛡️ Fraud Detection Rules
+##  Fraud Detection Rules
 
 ### High-Value Transaction Rule
 - Transactions > 100,000 BDT are automatically flagged
@@ -290,7 +290,7 @@ Invalid NIDs:
 - Device fingerprinting
 - Behavioral analysis
 
-## 🧪 Testing
+## Testing
 
 ### Run API Tests
 ```bash
@@ -312,7 +312,7 @@ python test_api.py
 - ❌ High-value transaction (fraud detection)
 - ✅ Transaction history retrieval
 
-## 🚀 Production Deployment
+## Production Deployment
 
 ### Environment Variables
 ```bash
@@ -349,7 +349,7 @@ DATABASE_URL=postgresql://username:password@localhost/wallet_db
 - [ ] Configure database backups
 - [ ] Set up monitoring and alerts
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 backend/
@@ -370,7 +370,7 @@ backend/
 └── README.md              # This file
 ```
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -378,17 +378,17 @@ backend/
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+##  Support
 
 For support and questions:
 - Create an issue on GitHub
-- Email: support@trustwallet.example.com
 
-## 🔄 Changelog
+
+##  Changelog
 
 ### v1.0.0 (Current)
 - Initial release
@@ -410,4 +410,3 @@ For support and questions:
 
 ---
 
-**Built with ❤️ for the Bangladesh digital payment ecosystem**
