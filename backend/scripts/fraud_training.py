@@ -392,17 +392,4 @@ for i, tx in enumerate(sample_txs):
     print(f"  Amount: {tx['amount']}, Type: {tx['type']}")
     print(f"  Prediction (isFraud): {predictions[i]}, Fraud Probability: {probabilities[i]:.6f}\n")
 
-"""| Feature            | How it's calculated / source            |
-| ------------------ | --------------------------------------- |
-| `type`             | Directly from dataset `type`            |
-| `amount`           | Directly from dataset `amount`          |
-| `payerdebited`     | `oldbalanceOrg - newbalanceOrig`        |
-| `recievercredited` | `newbalanceDest - oldbalanceDest`       |
-| `payer_type`       | First letter of `nameOrig` (`C` or `M`) |
-| `reciever_type`    | First letter of `nameDest` (`C` or `M`) |
-| `hour`             | `step` → datetime → `.hour`             |
-| `day_of_week`      | `step` → datetime → `.dayofweek`        |
-| `date`             | `step` → datetime → `.day`              |
-
 """
-

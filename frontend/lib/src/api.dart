@@ -1,4 +1,4 @@
-String BASE_URL_LOCAL = "http://127.0.0.1:8000";
+String BASE_URL_LOCAL = "http://localhost:8000";
 
 // Auth endpoints
 String login_endpoint = BASE_URL_LOCAL + "/api/v1/login";
