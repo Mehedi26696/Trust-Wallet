@@ -1,4 +1,4 @@
-String BASE_URL_LOCAL = "http://localhost:8000";
+String BASE_URL_LOCAL = "http://192.168.0.107:8000";
 
 // Auth endpoints
 String login_endpoint = BASE_URL_LOCAL + "/api/v1/login";
@@ -21,6 +21,11 @@ String send_money_endpoint = BASE_URL_LOCAL + "/api/v1/wallet/send";
 // Face endpoints
 String enroll_face_endpoint = BASE_URL_LOCAL + "/api/v1/face/enroll";
 String verify_face_endpoint = BASE_URL_LOCAL + "/api/v1/face/verify";
+
+// Chat endpoints
+String chat_endpoint = BASE_URL_LOCAL + "/api/v1/chat";
+String chat_health_endpoint = BASE_URL_LOCAL + "/api/v1/health";
+String chat_session_endpoint = BASE_URL_LOCAL + "/api/v1/session";
 
 String? authToken;
 Map<String, String> authHeaders() => {
