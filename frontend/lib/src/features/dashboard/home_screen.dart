@@ -190,6 +190,22 @@ class _Header extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          InkWell(
+            onTap: () => context.go('/profile'),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [kPrimary, kPrimaryDark],
+                ),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.person, color: Colors.white, size: 20),
+            ),
+          ),
           Image.asset(
             'assets/images/logo1.png',
             height: 32,
@@ -207,30 +223,61 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
-          Row(
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              IconButton(
-                onPressed: () => context.push('/chat'),
-                icon: const Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  color: kText,
-                ),
-              ),
-              const SizedBox(width: 8),
               InkWell(
-                onTap: () => context.go('/profile'),
+                onTap: () => context.push('/chat'),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: kPrimary, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(2),
+                  child: Image.asset(
+                    'assets/images/Tia.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -4,
+                right: -8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [kPrimary, kPrimaryDark],
                     ),
-                    border: Border.all(color: Colors.white, width: 2),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 20),
+                  child: const Text(
+                    'Tia',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.normal,
+                      fontFamily: 'InstrumentSans',
+                    ),
+                  ),
                 ),
               ),
             ],
