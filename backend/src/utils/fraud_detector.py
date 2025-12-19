@@ -372,3 +372,33 @@ def is_user_blocked(session: Session, user_id: UUID) -> bool:
     
     # Block if there are unresolved critical alerts in last 24 hours
     return len(critical_alerts) > 0
+
+
+def clear_user_fraud_block(session: Session, user_id: UUID) -> bool:
+    """
+    Clear all unresolved fraud alerts for a user to unblock their account.
+    
+    Args:
+        session: Database session
+        user_id (UUID): User ID to unblock
+        
+    Returns:
+        bool: True if alerts were cleared, False if no pending alerts
+    """
+    statement = select(FraudAlert).where(
+        FraudAlert.user_id == user_id,
+        FraudAlert.resolved == False
+    )
+    
+    unresolved_alerts = session.exec(statement).all()
+    
+    if not unresolved_alerts:
+        return False
+    
+    # Mark all unresolved alerts as resolved
+    for alert in unresolved_alerts:
+        alert.resolved = True
+        session.add(alert)
+    
+    session.commit()
+    return True

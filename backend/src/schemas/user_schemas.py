@@ -139,4 +139,11 @@ class UserProfile(BaseModel):
     wallet_balance: float
     created_at: datetime
     is_active: bool
-    # Config moved to model_config above
+
+
+class UnblockAccountResponse(BaseModel):
+    """Schema for account unblock response."""
+    user_id: UUID
+    success: bool
+    message: str
+    alerts_cleared: int

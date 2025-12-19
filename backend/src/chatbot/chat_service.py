@@ -3,6 +3,8 @@ from typing import Dict, List, Optional
 import google.generativeai as genai
 from datetime import datetime
 import os
+import httpx
+from ..config import settings
 
 
 
@@ -207,18 +209,18 @@ async def chat_with_tia(session_id: str, user_message: str) -> Dict[str, any]:
             - session_id: The session identifier
             - timestamp: Response timestamp
             - message_count: Number of messages in current session
+            - provider: Which AI provider was used (gemini or groq)
             
     Raises:
-        Exception: If Gemini API call fails
+        Exception: If both Gemini and Groq API calls fail
     """
+    history = get_session_history(session_id)
+    
+    # Try Gemini first
     try:
-  
         model = get_gemini_model()
         
-  
-        history = get_session_history(session_id)
-        
-        
+        # Convert history to Gemini format
         gemini_history = []
         for msg in history:
             gemini_history.append({
@@ -226,14 +228,12 @@ async def chat_with_tia(session_id: str, user_message: str) -> Dict[str, any]:
                 "parts": [msg.content]
             })
         
-      
+        # Start chat and get response
         chat = model.start_chat(history=gemini_history)
-        
-    
         response = chat.send_message(user_message)
         response_text = response.text
         
-       
+        # Add messages to session
         add_message_to_session(session_id, Message("user", user_message))
         add_message_to_session(session_id, Message("model", response_text))
         
@@ -241,13 +241,73 @@ async def chat_with_tia(session_id: str, user_message: str) -> Dict[str, any]:
             "response": response_text,
             "session_id": session_id,
             "timestamp": datetime.utcnow().isoformat(),
-            "message_count": len(get_session_history(session_id))
+            "message_count": len(get_session_history(session_id)),
+            "provider": "gemini"
         }
         
-    except Exception as e:
-      
-        print(f"Error in chat_with_tia: {str(e)}")
-        raise Exception(f"Failed to generate chatbot response: {str(e)}")
+    except Exception as gemini_error:
+        print(f"⚠️  Gemini API failed: {str(gemini_error)}")
+        print("🔄 Falling back to Groq...")
+        
+        # Fallback to Groq using httpx (same approach as groq_message_enhancer)
+        try:
+            groq_api_key = os.getenv("GROQ_API_KEY")
+            if not groq_api_key:
+                raise ValueError("GROQ_API_KEY not configured")
+            
+            # Convert history to Groq format (OpenAI-compatible)
+            groq_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            for msg in history:
+                # Convert "model" role to "assistant" for Groq/OpenAI compatibility
+                role = "assistant" if msg.role == "model" else msg.role
+                groq_messages.append({
+                    "role": role,
+                    "content": msg.content
+                })
+            
+            # Add current user message
+            groq_messages.append({
+                "role": "user",
+                "content": user_message
+            })
+            
+            # Call Groq API using httpx
+            with httpx.Client(timeout=10.0) as client:
+                response = client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {groq_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+                        "messages": groq_messages,
+                        "temperature": 0.7,
+                        "max_tokens": 500,
+                    },
+                )
+            
+            if response.status_code == 200:
+                data = response.json()
+                response_text = data["choices"][0]["message"]["content"]
+                
+                # Add messages to session
+                add_message_to_session(session_id, Message("user", user_message))
+                add_message_to_session(session_id, Message("model", response_text))
+                
+                return {
+                    "response": response_text,
+                    "session_id": session_id,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "message_count": len(get_session_history(session_id)),
+                    "provider": "groq"
+                }
+            else:
+                raise Exception(f"Groq API error {response.status_code}: {response.text}")
+            
+        except Exception as groq_error:
+            print(f"❌ Groq API also failed: {str(groq_error)}")
+            raise Exception(f"Both Gemini and Groq failed. Gemini: {str(gemini_error)}, Groq: {str(groq_error)}")
 
 
 def get_session_info(session_id: str) -> Dict[str, any]:

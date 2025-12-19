@@ -103,15 +103,15 @@ class WalletService:
                 detail="Insufficient balance"
             )
         
-        # Check for fraud
-        is_fraudulent, fraud_reason = check_fraudulent_activity(
-            session, sender.id, send_request.amount
+        # Check for fraud (rule-based)
+        is_fraudulent, fraud_reason, rule_severity = check_fraudulent_activity(
+            session, sender.id, float(send_request.amount), receiver_id=receiver.id
         )
         
         if is_fraudulent:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Transaction flagged for review"
+                detail=f"Transaction flagged: {fraud_reason}"
             )
         
         # Perform transaction
