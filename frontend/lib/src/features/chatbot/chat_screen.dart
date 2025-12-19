@@ -48,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _addWelcomeMessage() {
     setState(() {
       _messages.add(ChatMessage(
-        text: "Hi! I'm Tia, your TrustWallet assistant. 👋\n\nI can help you with:\n• Understanding app features\n• Wallet operations\n• Security tips\n• Finding your way around\n\nHow can I assist you today?",
+        text: "Hi! I'm Tia, your TrustWallet assistant. 👋\n\nHow can I assist you today?",
         isUser: false,
         timestamp: DateTime.now(),
       ));
@@ -196,7 +196,13 @@ class _ChatScreenState extends State<ChatScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: kText),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         title: Row(
           children: [
@@ -228,7 +234,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 Text(
-                  'Your Assistant',
+                  'Digital Assistant',
                   style: TextStyle(
                     fontSize: 12,
                     color: kSubtle,

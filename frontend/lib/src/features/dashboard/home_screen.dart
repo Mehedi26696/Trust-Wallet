@@ -210,7 +210,7 @@ class _Header extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                onPressed: () => context.go('/chat'),
+                onPressed: () => context.push('/chat'),
                 icon: const Icon(
                   Icons.chat_bubble_outline_rounded,
                   color: kText,
