@@ -18,6 +18,7 @@ import '../features/offers/top_shops_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/chatbot/chat_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -57,6 +58,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // GoRoute(path: '/offers', builder: (_, __) => const TopShopsScreen()),
       GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
       GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
     ],
   );
 });

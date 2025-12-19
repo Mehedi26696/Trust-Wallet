@@ -14,6 +14,7 @@ from .users.user_routes import router as user_router
 from .users.face_routes import router as face_router
 from .transactions.transaction_routes import router as transaction_router
 from .admin.admin_routes import router as admin_router
+from .chatbot.chat_routes import router as chat_router
 from .utils.database import test_database_connection
 from .config import settings
 
@@ -112,6 +113,7 @@ app.include_router(user_router , prefix="/api/v1", tags=["users"])
 app.include_router(face_router , prefix="/api/v1", tags=["face"]) 
 app.include_router(transaction_router, prefix="/api/v1", tags=["transactions"])
 app.include_router(admin_router , prefix="/api/v1/admin", tags=["admin"])
+app.include_router(chat_router, prefix="/api/v1", tags=["chat"])
 
 
 @app.get("/", tags=["root"])
