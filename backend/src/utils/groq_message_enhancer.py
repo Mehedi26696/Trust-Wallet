@@ -33,17 +33,15 @@ async def enhance_risk_message(
         return original_reason
     
     try:
-        # Construct prompt for Groq
         face_verify_note = " Note: Risk scores above 50% require face verification to proceed." if risk_score > 0.5 else ""
         prompt = f"""You are a helpful financial assistant for TrustWallet. A transaction has been flagged with the following details:
 
-Risk Level: {risk_level}
-Severity: {severity}
-Amount: ৳{amount:,.2f} BDT
-Risk Score: {risk_score:.1%}
-Technical Reason: {original_reason}
-
-Generate a brief, friendly message (2-3 sentences max) explaining why this transaction was flagged and what the user should know. Be reassuring if severity is low, cautious if medium, and firm if high/critical. Use simple language suitable for Bangladesh users.{face_verify_note} Do not use markdown formatting."""
+                Risk Level: {risk_level}
+                Severity: {severity}
+                Amount: ৳{amount:,.2f} BDT
+                Risk Score: {risk_score:.1%}
+                Technical Reason: {original_reason}
+                Generate a brief, friendly message (2-3 sentences max) explaining why this transaction was flagged and what the user should know. Be reassuring if severity is low, cautious if medium, and firm if high/critical. Use simple language suitable for Bangladesh users.{face_verify_note} Do not use markdown formatting."""
 
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(
