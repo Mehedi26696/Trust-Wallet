@@ -680,6 +680,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                                           'Done',
                                           style: TextStyle(
                                             fontFamily: 'InstrumentSans',
+                                            color: Colors.white,
                                           ),
                                         ),
                                       ),
