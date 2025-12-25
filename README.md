@@ -1409,7 +1409,10 @@ flutter run --debug
 ---
 ### Dataset
 
-The project uses the [Fraudulent Transactions Data](https://www.kaggle.com/datasets/chitwanmanchanda/fraudulent-transactions-data) dataset from Kaggle
+<span style="font-size:12px">
+The project uses the <a href="https://www.kaggle.com/datasets/chitwanmanchanda/fraudulent-transactions-data">Fraudulent Transactions Data</a> dataset from Kaggle.
+</span>
+
 ---
 ### Contributing
 
@@ -1418,29 +1421,29 @@ We welcome contributions to TrustWallet! To contribute, please follow these step
 1. **Fork the repository**  
    Click the "Fork" button at the top-right of this page.
 
-2. **Clone your fork**  `
+2. **Clone your fork**  
    ```bash
    https://github.com/Mehedi26696/Trust-Wallet.git
    cd TrustWallet
-3.Create a branch for your feature or bugfix
-```
-git checkout -b feature/your-feature-name
-```
-4.Make Your Changes
+3. **Create a branch for your feature or bugfix**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+4. **Make Your Changes**
 
 - Follow the existing code style to keep the project consistent.  
 - Add tests for any new features or bug fixes to ensure stability.  
-5. Commit and push your changes
-  ```
-  git add .
-  git commit -m "Add description of changes"
-  git push origin feature/your-feature-name
-  ```
-6. Open a Pull Request (PR)
+5. **Commit and push your changes**
+    ```bash
+   git add .
+   git commit -m "Add description of changes"
+   git push origin feature/your-feature-name
+   ```
+6. **Open a Pull Request (PR)**
 - Describe the problem and your solution clearly.
 - Reference any related issues with #issue_number.
 - Wait for review and feedback.
-
+---
 ### Reporting Bugs
 
 When reporting bugs, please include:
