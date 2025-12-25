@@ -31,6 +31,7 @@
 - [Database Schema](#-database-schema)
 - [Environment Configuration](#-environment-configuration)
 - [Testing](#-testing)
+- [Dataset](#dataset)
 - [Contributing](#-contributing)
 - [Reporting Bugs](#-reporting-bugs)
 - [License](#-license)
@@ -1405,6 +1406,10 @@ flutter test integration_test/
 flutter run --debug
 ```
 
+---
+### Dataset
+
+The project uses the [Fraudulent Transactions Data](https://www.kaggle.com/datasets/chitwanmanchanda/fraudulent-transactions-data) dataset from Kaggle
 ---
 ### Contributing
 
