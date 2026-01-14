@@ -14,24 +14,24 @@ class Settings:
     """Application settings loaded from environment variables."""
     
     # Database - Supabase Configuration
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
-    SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
-    SUPABASE_ANON_KEY: Optional[str] = os.getenv("SUPABASE_ANON_KEY")
-    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "").strip()
+    SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL", "").strip() or None
+    SUPABASE_ANON_KEY: Optional[str] = os.getenv("SUPABASE_ANON_KEY", "").strip() or None
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip() or None
     
     # JWT Authentication
-    SECRET_KEY: str = os.getenv("SECRET_KEY")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "").strip()
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 
     # GROQ
-    GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY", "").strip() or None
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant").strip()
     
     # Gemini (for chatbot)
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", "").strip() or None
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 
     
     # Application

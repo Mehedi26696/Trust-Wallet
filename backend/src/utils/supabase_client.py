@@ -155,6 +155,76 @@ class SupabaseClient:
             return None
 
 
+    def upload_file(self, bucket: str, path: str, file: bytes, content_type: str = "image/jpeg"):
+        """
+        Upload a file to a Supabase bucket. Uses admin client to bypass RLS.
+        
+        Args:
+            bucket (str): Bucket name
+            path (str): File path within bucket
+            file (bytes): File content in bytes
+            content_type (str): Content type header
+            
+        Returns:
+            dict: Upload response
+        """
+        client = self.get_admin_client() or self.client
+        if not client:
+            return None
+        
+        try:
+            return client.storage.from_(bucket).upload(
+                path=path,
+                file=file,
+                file_options={"content-type": content_type, "upsert": True}
+            )
+        except Exception as e:
+            print(f"❌ Failed to upload file to Supabase storage: {e}")
+            return None
+
+    def download_file(self, bucket: str, path: str) -> Optional[bytes]:
+        """
+        Download a file from a Supabase bucket. Uses admin client to bypass RLS.
+        
+        Args:
+            bucket (str): Bucket name
+            path (str): File path within bucket
+            
+        Returns:
+            bytes: File content or None if failed
+        """
+        client = self.get_admin_client() or self.client
+        if not client:
+            return None
+        
+        try:
+            return client.storage.from_(bucket).download(path)
+        except Exception as e:
+            print(f"❌ Failed to download file from Supabase storage: {e}")
+            return None
+
+    def get_public_url(self, bucket: str, path: str) -> Optional[str]:
+        """
+        Get public URL for a file in a Supabase bucket.
+        
+        Args:
+            bucket (str): Bucket name
+            path (str): File path within bucket
+            
+        Returns:
+            str: Public URL or None if failed
+        """
+        client = self.client # Public URL doesn't need admin
+        if not client:
+            return None
+        
+        try:
+            return client.storage.from_(bucket).get_public_url(path)
+        except Exception as e:
+            print(f"❌ Failed to get public URL from Supabase storage: {e}")
+            return None
+
+
 # Global Supabase client instance
 supabase_client = SupabaseClient()
 

@@ -14,6 +14,7 @@ except Exception:
 from ..auth.auth_service import get_current_user
 from ..models.user import User
 from ..utils.database import get_session
+from ..utils.supabase_client import supabase_client
 
 router = APIRouter()
 
@@ -64,12 +65,8 @@ async def enroll_face(
         print(f"Rejected content type: {file.content_type}", file=sys.stderr)
         raise HTTPException(status_code=400, detail="Unsupported image type")
 
-    faces_dir = _faces_dir()
-    filename = f"{current_user.id}.jpg"
-    save_path = os.path.join(faces_dir, filename)
-
     try:
-        # Read and save the image
+        # Read the image
         data = await file.read()
         print(f"Read {len(data)} bytes from file", file=sys.stderr)
         
@@ -86,39 +83,38 @@ async def enroll_face(
             print(f"Image validation failed: {str(e)}", file=sys.stderr)
             raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
         
-        # Write file to disk
-        with open(save_path, "wb") as f:
-            f.write(data)
-        print(f"File written to: {save_path}", file=sys.stderr)
+        # Upload to Supabase Storage
+        bucket_name = "face"
+        path_in_bucket = f"{current_user.id}.jpg"
         
-        # Verify file was written
-        if not os.path.exists(save_path):
-            raise Exception(f"Failed to write file to {save_path}")
+        print(f"Uploading to Supabase bucket '{bucket_name}', path '{path_in_bucket}'", file=sys.stderr)
+        upload_res = supabase_client.upload_file(
+            bucket=bucket_name,
+            path=path_in_bucket,
+            file=data,
+            content_type=file.content_type or "image/jpeg"
+        )
         
-        file_size = os.path.getsize(save_path)
-        if file_size == 0:
-            raise Exception("File was written but is empty")
-        
-        print(f"File size on disk: {file_size} bytes", file=sys.stderr)
+        if not upload_res:
+             # Try to get public URL even if upload "failed" (sometimes it fails if already exists and x-upsert logic differs)
+             # But here we use x-upsert: true in the client.
+             raise Exception("Failed to upload image to Supabase Storage")
 
-        # Compute embedding with DeepFace (for reference, not stored yet)
-        embedding_result = _get_face_embedding(save_path)
-        print(f"Face embedding computed: {bool(embedding_result)}", file=sys.stderr)
-
-        # Update user record with relative path for portability
-        relative_path = os.path.relpath(save_path, os.path.abspath("."))
-        current_user.face_image_path = relative_path
+        # Get public URL or just store the bucket path
+        # Storing the bucket path "face/userid.jpg" is more portable
+        supabase_path = f"{bucket_name}/{path_in_bucket}"
+        current_user.face_image_path = supabase_path
         session.add(current_user)
         session.commit()
         session.refresh(current_user)
         
-        print(f"User face record updated successfully", file=sys.stderr)
+        print(f"User face record updated successfully with Supabase path: {supabase_path}", file=sys.stderr)
 
         return {
             "status": "ok",
             "enrolled": True,
-            "file_size": file_size,
-            "path": relative_path
+            "file_size": len(data),
+            "supabase_path": supabase_path
         }
     except HTTPException:
         session.rollback()
@@ -126,12 +122,6 @@ async def enroll_face(
     except Exception as e:
         print(f"Face enrollment error: {str(e)}", file=sys.stderr)
         session.rollback()
-        # Clean up file if write failed
-        try:
-            if os.path.exists(save_path):
-                os.remove(save_path)
-        except Exception:
-            pass
         raise HTTPException(status_code=500, detail=f"Failed to enroll face: {str(e)}")
 
 
@@ -146,57 +136,66 @@ async def verify_face(
     Uses perceptual hash distance as a lightweight proxy (not true biometrics).
     Returns verified: true/false.
     """
-    # Resolve relative path to absolute path
-    enrolled_path = current_user.face_image_path
-    if enrolled_path:
-        # If it's a relative path, make it absolute from current working directory
-        if not os.path.isabs(enrolled_path):
-            enrolled_path = os.path.abspath(enrolled_path)
-    
-    if not enrolled_path or not os.path.exists(enrolled_path):
+    # enrolled_path is now likely "face/userid.jpg"
+    supabase_path = current_user.face_image_path
+    if not supabase_path:
         raise HTTPException(status_code=400, detail="No enrolled face on record")
-
-    # Be lenient and validate via decoder later
-    allowed_types = {"image/jpeg", "image/png", "image/jpg", "application/octet-stream"}
-    if file.content_type and file.content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail="Unsupported image type")
 
     # If DeepFace not available, return error
     if not HAS_DEEPFACE:
         raise HTTPException(status_code=500, detail="Face recognition service not available")
 
+    import tempfile
+    
+    enrolled_temp = None
+    verify_temp = None
+    
     try:
-        # Save temp file for verification
-        faces_dir = _faces_dir()
-        temp_path = os.path.join(faces_dir, f"verify_{current_user.id}.jpg")
+        # 1. Download enrolled image from Supabase to a temp file
+        try:
+            parts = supabase_path.split("/")
+            bucket = parts[0]
+            blob_path = "/".join(parts[1:])
+            
+            enrolled_data = supabase_client.download_file(bucket, blob_path)
+            if not enrolled_data:
+                raise Exception("Failed to download enrolled image from Supabase")
+                
+            enrolled_temp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+            enrolled_temp.write(enrolled_data)
+            enrolled_temp.close()
+        except Exception as e:
+            print(f"Download error: {e}", file=sys.stderr)
+            raise HTTPException(status_code=500, detail="Failed to retrieve enrolled face")
+
+        # 2. Save current upload to another temp file
         data = await file.read()
-        
         if not data:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
-        
-        with open(temp_path, "wb") as f:
-            f.write(data)
+            
+        verify_temp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        verify_temp.write(data)
+        verify_temp.close()
 
-        # Use DeepFace for verification
+        # 3. Use DeepFace for verification
         try:
-            # Use verify method which compares two faces and returns similarity metrics
-            result = DeepFace.verify(img1_path=enrolled_path, img2_path=temp_path, 
-                                    model_name="Facenet512", enforce_detection=True)
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
-            # result is dict with 'verified' (bool), 'distance' (float), 'threshold' (float), 'model', 'detector_backend'
+            result = DeepFace.verify(
+                img1_path=enrolled_temp.name, 
+                img2_path=verify_temp.name, 
+                model_name="Facenet512", 
+                enforce_detection=True
+            )
+            
             is_verified = result.get("verified", False)
             distance = result.get("distance", 999)
             return {"verified": is_verified, "distance": float(distance), "method": "deepface"}
         except Exception as e:
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
+            print(f"DeepFace error: {e}", file=sys.stderr)
             raise HTTPException(status_code=400, detail=f"Face verification failed: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to verify face: {str(e)}")
+            
+    finally:
+        # Cleanup
+        if enrolled_temp and os.path.exists(enrolled_temp.name):
+            os.remove(enrolled_temp.name)
+        if verify_temp and os.path.exists(verify_temp.name):
+            os.remove(verify_temp.name)
