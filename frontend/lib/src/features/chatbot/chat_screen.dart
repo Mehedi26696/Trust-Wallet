@@ -629,7 +629,7 @@ class _MessageBubble extends StatelessWidget {
                     gradient: message.isUser
                         ? null
                         : const LinearGradient(
-                            colors: [kPrimary, Colors.white],
+                            colors:[Color.fromARGB(255, 208, 229, 245),  Colors.white],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),

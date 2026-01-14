@@ -114,6 +114,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           label: const Text('Capture Face'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2196F3),
+                            foregroundColor: Colors.white,
                           ),
                           onPressed: () async {
                             final picker = ImagePicker();
