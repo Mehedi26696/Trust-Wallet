@@ -99,6 +99,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
           appBar: AppBar(
             backgroundColor: Color.fromARGB(255, 2, 101, 250),
             elevation: 0,
+            centerTitle: true,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => context.go('/scan'),
@@ -108,9 +109,9 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
               style: TextStyle(
                 fontFamily: 'InstrumentSans',
                 fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color.fromARGB(255, 245, 245, 245),
-                letterSpacing: -0.1,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                letterSpacing: -1,
               ),
             ),
           ),
@@ -440,15 +441,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // Tiny legal note
-                const Text(
-                  'No real money moves in this demo.',
-                  style: TextStyle(
-                    fontFamily: 'InstrumentSans',
-                    fontSize: 12,
-                    color: Color(0xFF9E9E9E),
-                  ),
-                ),
+                
               ],
             ),
           ),

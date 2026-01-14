@@ -15,6 +15,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool isLoading = true;
   String? errorMessage;
   Map<String, dynamic>? userData;
+  double walletBalance = 0.0;
 
   @override
   void initState() {
@@ -24,14 +25,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _fetchProfile() async {
     try {
-      final response = await http.get(
+      // Fetch profile data
+      final profileResponse = await http.get(
         Uri.parse(profile_endpoint),
         headers: authHeaders(),
       );
 
-      if (response.statusCode == 200) {
+      // Fetch wallet balance
+      final walletResponse = await http.get(
+        Uri.parse(wallet_balance_endpoint),
+        headers: authHeaders(),
+      );
+
+      if (profileResponse.statusCode == 200 &&
+          walletResponse.statusCode == 200) {
+        final walletData = jsonDecode(walletResponse.body);
         setState(() {
-          userData = jsonDecode(response.body);
+          userData = jsonDecode(profileResponse.body);
+          walletBalance = (walletData['balance'] ?? 0.0).toDouble();
           isLoading = false;
         });
       } else {
@@ -50,50 +61,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 2, 101, 250),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.go('/home'),
-        ),
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-            fontFamily: 'InstrumentSans',
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: -0.1,
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color.fromARGB(255, 151, 212, 255), // Sky blue at bottom
+            Colors.white, // White at top
+          ],
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
         ),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(errorMessage!),
-                      ElevatedButton(
-                        onPressed: _fetchProfile,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _ProfileHeader(userData: userData!),
-                      const SizedBox(height: 20),
-                      _ProfileDetails(userData: userData!),
-                    ],
-                  ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: const Color.fromARGB(255, 2, 101, 250),
+          elevation: 0,
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => context.go('/home'),
+          ),
+          title: const Text(
+            'Profile',
+            style: TextStyle(
+              fontFamily: 'InstrumentSans',
+              fontSize: 22,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              letterSpacing: -1,
+            ),
+          ),
+        ),
+        body: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : errorMessage != null
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(errorMessage!),
+                    ElevatedButton(
+                      onPressed: _fetchProfile,
+                      child: const Text('Retry'),
+                    ),
+                  ],
                 ),
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _ProfileHeader(userData: userData!),
+                    const SizedBox(height: 20),
+                    _ProfileDetails(
+                      userData: userData!,
+                      walletBalance: walletBalance,
+                    ),
+                  ],
+                ),
+              ),
+      ),
     );
   }
 }
@@ -171,8 +198,9 @@ class _ProfileHeader extends StatelessWidget {
 
 class _ProfileDetails extends StatelessWidget {
   final Map<String, dynamic> userData;
+  final double walletBalance;
 
-  const _ProfileDetails({required this.userData});
+  const _ProfileDetails({required this.userData, required this.walletBalance});
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +223,7 @@ class _ProfileDetails extends StatelessWidget {
           _buildInfoTile(
             icon: Icons.account_balance_wallet_rounded,
             title: 'Wallet Balance',
-            value: '৳${(userData['balance'] ?? 0.0).toString()}',
+            value: '৳${walletBalance.toStringAsFixed(2)}',
           ),
         ],
       ),

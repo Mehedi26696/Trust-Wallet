@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../mock/mock_services.dart';
+import '../../core/widgets/rounded_navbar.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -12,6 +13,7 @@ class ScanScreen extends StatefulWidget {
 
 class _ScanScreenState extends State<ScanScreen> {
   final ms = MerchantService();
+  final int _tab = 2; // Scan tab index
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +106,15 @@ class _ScanScreenState extends State<ScanScreen> {
                 ),
               ],
             ),
+          ),
+          bottomNavigationBar: RoundedNavBar(
+            currentIndex: _tab,
+            onTap: (i) {
+              if (i == _tab) return;
+              if (i == 0) context.go('/home');
+              if (i == 1) context.go('/history');
+              if (i == 3) context.go('/settings');
+            },
           ),
         ),
       ),
