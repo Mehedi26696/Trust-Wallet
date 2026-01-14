@@ -104,7 +104,9 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
       );
       final resp = await req.send();
       if (resp.statusCode == 200) {
-        setState(() => _faceVerified = true); // Enrolling also counts as verified for this session
+        setState(
+          () => _faceVerified = true,
+        ); // Enrolling also counts as verified for this session
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -192,378 +194,414 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
     final now = DateTime.now();
     final timeFormat = DateFormat('hh:mm a');
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 22, 80, 240),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E1E1E)),
-          onPressed: () => context.go('/send'),
-        ),
-        title: const Text(
-          'Review & Confirm',
-          style: TextStyle(
-            fontFamily: 'InstrumentSans',
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color.fromARGB(255, 255, 255, 255),
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color.fromARGB(255, 151, 212, 255), // Sky blue at bottom
+            Colors.white, // White at top
+          ],
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Recipient Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: const Color.fromARGB(255, 2, 101, 250),
+          elevation: 0,
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => context.go('/send'),
+          ),
+          title: const Text(
+            'Review & Confirm',
+            style: TextStyle(
+              fontFamily: 'InstrumentSans',
+              fontSize: 22,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              letterSpacing: -1,
+            ),
+          ),
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Recipient Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 28,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            receiverName,
+                            style: const TextStyle(
+                              fontFamily: 'InstrumentSans',
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E1E1E),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            phone,
+                            style: const TextStyle(
+                              fontFamily: 'InstrumentSans',
+                              fontSize: 12,
+                              color: Color(0xFF626C7A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Transaction Details
+              const Text(
+                'Transaction Details',
+                style: TextStyle(
+                  fontFamily: 'InstrumentSans',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Amount Display - Large
+                    Center(
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Transaction Amount',
+                            style: TextStyle(
+                              fontFamily: 'InstrumentSans',
+                              fontSize: 12,
+                              color: Color(0xFF626C7A),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _bdt.format(amount),
+                            style: const TextStyle(
+                              fontFamily: 'InstrumentSans',
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2196F3),
+                              letterSpacing: -1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    _DetailRow(
+                      label: 'Transaction Fee',
+                      value: _bdt.format(fee),
+                    ),
+                    const SizedBox(height: 8),
+                    _DetailRow(
+                      label: 'Service Fee (VAT)',
+                      value: _bdt.format(vat),
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    _DetailRow(
+                      label: 'Total Payable',
+                      value: _bdt.format(total),
+                      isBold: true,
+                      valueColor: const Color(0xFF1E1E1E),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Additional Info
+              const Text(
+                'Additional Info',
+                style: TextStyle(
+                  fontFamily: 'InstrumentSans',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E1E1E),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _InfoRow(
+                      icon: Icons.access_time,
+                      label: 'Time',
+                      value: DateFormat('hh:mm a').format(now),
+                    ),
+                    const Divider(height: 24),
+                    _InfoRow(
+                      icon: Icons.calendar_today,
+                      label: 'Date',
+                      value: DateFormat('dd MMM yyyy').format(now),
+                    ),
+                    const Divider(height: 24),
+                    const _InfoRow(
+                      icon: Icons.payment,
+                      label: 'Payment Type',
+                      value: 'Instant Transfer',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Risk
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _riskBg(level),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _riskColor(level)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.shield, color: _riskColor(level)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$reason — ($score)',
+                        style: TextStyle(
+                          color: _riskColor(level),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: _riskColor(level)),
+                      ),
+                      child: Text(level.toUpperCase()),
+                    ),
+                  ],
+                ),
+              ),
+              if (needsStepUp) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE65100)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFFE65100),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          needsStepUp && !isEnrolled
+                              ? 'Face enrollment required to proceed with this transfer.'
+                              : 'High risk detected ($score%). Verify your face to proceed.',
+                          style: const TextStyle(color: Color(0xFFE65100)),
+                        ),
+                      ),
+                      if (!_faceVerified)
+                        TextButton(
+                          onPressed: isEnrolled
+                              ? _verifyFaceNow
+                              : _enrollFaceNow,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: const Color(0xFF1976D2),
+                          ),
+                          child: Text(
+                            isEnrolled ? 'Verify Face' : 'Setup Face',
+                          ),
+                        )
+                      else
+                        const Icon(Icons.verified, color: Color(0xFF4CAF50)),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 28),
+
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF2196F3)),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _verifying ? null : () => context.pop(),
+                      child: const Text(
+                        'Go Back',
+                        style: TextStyle(
+                          fontFamily: 'InstrumentSans',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2196F3),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          receiverName,
-                          style: const TextStyle(
-                            fontFamily: 'InstrumentSans',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E1E1E),
-                          ),
+                    flex: 2,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2196F3),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          phone,
-                          style: const TextStyle(
-                            fontFamily: 'InstrumentSans',
-                            fontSize: 12,
-                            color: Color(0xFF626C7A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Transaction Details
-            const Text(
-              'Transaction Details',
-              style: TextStyle(
-                fontFamily: 'InstrumentSans',
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E1E1E),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // Amount Display - Large
-                  Center(
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Transaction Amount',
-                          style: TextStyle(
-                            fontFamily: 'InstrumentSans',
-                            fontSize: 12,
-                            color: Color(0xFF626C7A),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _bdt.format(amount),
-                          style: const TextStyle(
-                            fontFamily: 'InstrumentSans',
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2196F3),
-                            letterSpacing: -1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  _DetailRow(label: 'Transaction Fee', value: _bdt.format(fee)),
-                  const SizedBox(height: 8),
-                  _DetailRow(
-                    label: 'Service Fee (VAT)',
-                    value: _bdt.format(vat),
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  _DetailRow(
-                    label: 'Total Payable',
-                    value: _bdt.format(total),
-                    isBold: true,
-                    valueColor: const Color(0xFF1E1E1E),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Additional Info
-            const Text(
-              'Additional Info',
-              style: TextStyle(
-                fontFamily: 'InstrumentSans',
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E1E1E),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _InfoRow(
-                    icon: Icons.access_time,
-                    label: 'Time',
-                    value: DateFormat('hh:mm a').format(now),
-                  ),
-                  const Divider(height: 24),
-                  _InfoRow(
-                    icon: Icons.calendar_today,
-                    label: 'Date',
-                    value: DateFormat('dd MMM yyyy').format(now),
-                  ),
-                  const Divider(height: 24),
-                  const _InfoRow(
-                    icon: Icons.payment,
-                    label: 'Payment Type',
-                    value: 'Instant Transfer',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Risk
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _riskBg(level),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _riskColor(level)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.shield, color: _riskColor(level)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '$reason — ($score)',
-                      style: TextStyle(
-                        color: _riskColor(level),
-                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: _riskColor(level)),
-                    ),
-                    child: Text(level.toUpperCase()),
-                  ),
-                ],
-              ),
-            ),
-            if (needsStepUp) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE65100)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Color(0xFFE65100),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        needsStepUp && !isEnrolled
-                            ? 'Face enrollment required to proceed with this transfer.'
-                            : 'High risk detected ($score%). Verify your face to proceed.',
-                        style: const TextStyle(color: Color(0xFFE65100)),
-                      ),
-                    ),
-                    if (!_faceVerified)
-                      TextButton(
-                        onPressed: isEnrolled ? _verifyFaceNow : _enrollFaceNow,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: const Color(0xFF1976D2),
-                        ),
-                        child: Text(isEnrolled ? 'Verify Face' : 'Setup Face'),
-                      )
-                    else
-                      const Icon(Icons.verified, color: Color(0xFF4CAF50)),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 28),
-
-            // Actions
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF2196F3)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: _verifying ? null : () => context.pop(),
-                    child: const Text(
-                      'Go Back',
-                      style: TextStyle(
-                        fontFamily: 'InstrumentSans',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2196F3),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2196F3),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: _verifying
-                        ? null
-                        : () async {
-                            // High-risk face verification (required)
-                            if (needsStepUp && !_faceVerified) {
-                              final picker = ImagePicker();
-                              final img = await picker.pickImage(
-                                source: ImageSource.camera,
-                                preferredCameraDevice: CameraDevice.front,
-                                imageQuality: 85,
-                              );
-                              if (img == null) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Face verification required',
+                      onPressed: _verifying
+                          ? null
+                          : () async {
+                              // High-risk face verification (required)
+                              if (needsStepUp && !_faceVerified) {
+                                final picker = ImagePicker();
+                                final img = await picker.pickImage(
+                                  source: ImageSource.camera,
+                                  preferredCameraDevice: CameraDevice.front,
+                                  imageQuality: 85,
+                                );
+                                if (img == null) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Face verification required',
+                                        ),
+                                        backgroundColor: Colors.red,
                                       ),
-                                      backgroundColor: Colors.red,
+                                    );
+                                  }
+                                  return;
+                                }
+                                try {
+                                  final req = http.MultipartRequest(
+                                    'POST',
+                                    Uri.parse(verify_face_endpoint),
+                                  );
+                                  req.headers['Authorization'] =
+                                      'Bearer $authToken';
+                                  req.files.add(
+                                    await http.MultipartFile.fromPath(
+                                      'file',
+                                      img.path,
+                                      filename: 'verify.jpg',
                                     ),
                                   );
-                                }
-                                return;
-                              }
-                              try {
-                                final req = http.MultipartRequest(
-                                  'POST',
-                                  Uri.parse(verify_face_endpoint),
-                                );
-                                req.headers['Authorization'] =
-                                    'Bearer $authToken';
-                                req.files.add(
-                                  await http.MultipartFile.fromPath(
-                                    'file',
-                                    img.path,
-                                    filename: 'verify.jpg',
-                                  ),
-                                );
-                                final resp = await req.send();
-                                if (resp.statusCode == 200) {
-                                  final body = await resp.stream
-                                      .bytesToString();
-                                  final json =
-                                      jsonDecode(body) as Map<String, dynamic>;
-                                  setState(
-                                    () => _faceVerified =
-                                        json['verified'] == true,
-                                  );
-                                  if (!_faceVerified) {
+                                  final resp = await req.send();
+                                  if (resp.statusCode == 200) {
+                                    final body = await resp.stream
+                                        .bytesToString();
+                                    final json =
+                                        jsonDecode(body)
+                                            as Map<String, dynamic>;
+                                    setState(
+                                      () => _faceVerified =
+                                          json['verified'] == true,
+                                    );
+                                    if (!_faceVerified) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Face verification failed',
+                                            ),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                      return;
+                                    }
+                                  } else {
                                     if (mounted) {
                                       ScaffoldMessenger.of(
                                         context,
@@ -578,12 +616,12 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                                     }
                                     return;
                                   }
-                                } else {
+                                } catch (_) {
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Face verification failed',
+                                          'Error during face verification',
                                         ),
                                         backgroundColor: Colors.red,
                                       ),
@@ -591,320 +629,311 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                                   }
                                   return;
                                 }
-                              } catch (_) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Error during face verification',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                                return;
                               }
-                            }
 
-                            setState(() => _verifying = true);
+                              setState(() => _verifying = true);
 
-                            try {
-                              // Call backend confirm-send API
-                              final response = await http.post(
-                                Uri.parse(confirm_send_endpoint),
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': 'Bearer $authToken',
-                                },
-                                body: jsonEncode({
-                                  'receiver_phone': phone,
-                                  'amount': double.parse(amountStr),
-                                }),
-                              );
-
-                              if (!mounted) return;
-
-                              if (response.statusCode == 201) {
-                                final result = jsonDecode(response.body);
-                                final transaction = result['transaction'];
-                                final txnId = transaction['id'];
-
-                                // Show success and navigate to home
-                                await showDialog(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (_) => AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 60,
-                                          height: 60,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF4CAF50),
-                                            borderRadius: BorderRadius.circular(
-                                              30,
-                                            ),
-                                          ),
-                                          child: const Icon(
-                                            Icons.check,
-                                            color: Colors.white,
-                                            size: 40,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        const Text(
-                                          'Transaction Successful!',
-                                          style: TextStyle(
-                                            fontFamily: 'InstrumentSans',
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          '৳${amountStr} sent to $receiverName',
-                                          style: const TextStyle(
-                                            fontFamily: 'InstrumentSans',
-                                            color: Color(0xFF626C7A),
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Transaction ID: ${txnId.toString().substring(0, 8)}...',
-                                          style: const TextStyle(
-                                            fontFamily: 'InstrumentSans',
-                                            fontSize: 12,
-                                            color: Color(0xFF9E9E9E),
-                                          ),
-                                        ),
-                                        if (result['warning'] != null) ...[
-                                          const SizedBox(height: 12),
-                                          Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFFFF3E0),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.warning_amber,
-                                                  color: Color(0xFFE65100),
-                                                  size: 16,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    result['warning']['reason'],
-                                                    style: const TextStyle(
-                                                      fontFamily:
-                                                          'InstrumentSans',
-                                                      fontSize: 11,
-                                                      color: Color(0xFFE65100),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    actions: [
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(
-                                            0xFF2196F3,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          Navigator.pop(context);
-                                          context.go('/home');
-                                        },
-                                        child: const Text(
-                                          'Done',
-                                          style: TextStyle(
-                                            fontFamily: 'InstrumentSans',
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              try {
+                                // Call backend confirm-send API
+                                final response = await http.post(
+                                  Uri.parse(confirm_send_endpoint),
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer $authToken',
+                                  },
+                                  body: jsonEncode({
+                                    'receiver_phone': phone,
+                                    'amount': double.parse(amountStr),
+                                  }),
                                 );
-                              } else if (response.statusCode == 409) {
-                                // Transaction blocked by Fraud Detection
-                                final error = jsonDecode(response.body);
-                                final warning = error['detail']['warning'];
-                                final biometricsRequired =
-                                    warning['biometrics_required'] == true;
-                                final faceEnrolled =
-                                    warning['face_enrolled'] == true;
 
-                                if (mounted) {
-                                  showDialog(
+                                if (!mounted) return;
+
+                                if (response.statusCode == 201) {
+                                  final result = jsonDecode(response.body);
+                                  final transaction = result['transaction'];
+                                  final txnId = transaction['id'];
+
+                                  // Show success and navigate to home
+                                  await showDialog(
                                     context: context,
                                     barrierDismissible: false,
                                     builder: (_) => AlertDialog(
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          16,
-                                        ),
-                                      ),
-                                      title: Text(
-                                        biometricsRequired
-                                            ? 'Verification Required'
-                                            : 'Transaction Blocked',
-                                        style: TextStyle(
-                                          fontFamily: 'InstrumentSans',
-                                          fontWeight: FontWeight.bold,
-                                          color: biometricsRequired
-                                              ? const Color(0xFFE65100)
-                                              : const Color(0xFFD32F2F),
-                                        ),
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
                                       content: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
-                                            biometricsRequired
-                                                ? Icons.face_unlock_rounded
-                                                : Icons.block,
-                                            color: biometricsRequired
-                                                ? const Color(0xFFE65100)
-                                                : const Color(0xFFD32F2F),
-                                            size: 48,
+                                          Container(
+                                            width: 60,
+                                            height: 60,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF4CAF50),
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                            ),
+                                            child: const Icon(
+                                              Icons.check,
+                                              color: Colors.white,
+                                              size: 40,
+                                            ),
                                           ),
                                           const SizedBox(height: 16),
+                                          const Text(
+                                            'Transaction Successful!',
+                                            style: TextStyle(
+                                              fontFamily: 'InstrumentSans',
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
                                           Text(
-                                            warning['reason'],
+                                            '৳${amountStr} sent to $receiverName',
                                             style: const TextStyle(
                                               fontFamily: 'InstrumentSans',
+                                              color: Color(0xFF626C7A),
                                             ),
                                             textAlign: TextAlign.center,
                                           ),
-                                          if (biometricsRequired) ...[
-                                            const SizedBox(height: 20),
-                                            const Text(
-                                              'To secure this account, we need to verify your identity before proceeding.',
-                                              style: TextStyle(
-                                                fontFamily: 'InstrumentSans',
-                                                fontSize: 12,
-                                                color: Colors.grey,
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Transaction ID: ${txnId.toString().substring(0, 8)}...',
+                                            style: const TextStyle(
+                                              fontFamily: 'InstrumentSans',
+                                              fontSize: 12,
+                                              color: Color(0xFF9E9E9E),
+                                            ),
+                                          ),
+                                          if (result['warning'] != null) ...[
+                                            const SizedBox(height: 12),
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFFF3E0),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
-                                              textAlign: TextAlign.center,
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.warning_amber,
+                                                    color: Color(0xFFE65100),
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      result['warning']['reason'],
+                                                      style: const TextStyle(
+                                                        fontFamily:
+                                                            'InstrumentSans',
+                                                        fontSize: 11,
+                                                        color: Color(
+                                                          0xFFE65100,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ],
                                         ],
                                       ),
                                       actions: [
-                                        TextButton(
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFF2196F3,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
                                           onPressed: () {
                                             Navigator.pop(context);
                                             context.go('/home');
                                           },
-                                          child: const Text('Cancel'),
+                                          child: const Text(
+                                            'Done',
+                                            style: TextStyle(
+                                              fontFamily: 'InstrumentSans',
+                                              color: Colors.white,
+                                            ),
+                                          ),
                                         ),
-                                        if (biometricsRequired)
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  const Color(0xFF2196F3),
+                                      ],
+                                    ),
+                                  );
+                                } else if (response.statusCode == 409) {
+                                  // Transaction blocked by Fraud Detection
+                                  final error = jsonDecode(response.body);
+                                  final warning = error['detail']['warning'];
+                                  final biometricsRequired =
+                                      warning['biometrics_required'] == true;
+                                  final faceEnrolled =
+                                      warning['face_enrolled'] == true;
+
+                                  if (mounted) {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (_) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                        title: Text(
+                                          biometricsRequired
+                                              ? 'Verification Required'
+                                              : 'Transaction Blocked',
+                                          style: TextStyle(
+                                            fontFamily: 'InstrumentSans',
+                                            fontWeight: FontWeight.bold,
+                                            color: biometricsRequired
+                                                ? const Color(0xFFE65100)
+                                                : const Color(0xFFD32F2F),
+                                          ),
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              biometricsRequired
+                                                  ? Icons.face_unlock_rounded
+                                                  : Icons.block,
+                                              color: biometricsRequired
+                                                  ? const Color(0xFFE65100)
+                                                  : const Color(0xFFD32F2F),
+                                              size: 48,
                                             ),
-                                            onPressed: () {
-                                              Navigator.pop(context);
-                                              if (faceEnrolled) {
-                                                _verifyFaceNow();
-                                              } else {
-                                                _enrollFaceNow();
-                                              }
-                                            },
-                                            child: Text(
-                                              faceEnrolled
-                                                  ? 'Verify Face'
-                                                  : 'Setup Face ID',
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              warning['reason'],
+                                              style: const TextStyle(
+                                                fontFamily: 'InstrumentSans',
+                                              ),
+                                              textAlign: TextAlign.center,
                                             ),
-                                          )
-                                        else
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  const Color(0xFF2196F3),
-                                            ),
+                                            if (biometricsRequired) ...[
+                                              const SizedBox(height: 20),
+                                              const Text(
+                                                'To secure this account, we need to verify your identity before proceeding.',
+                                                style: TextStyle(
+                                                  fontFamily: 'InstrumentSans',
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
                                             onPressed: () {
                                               Navigator.pop(context);
                                               context.go('/home');
                                             },
-                                            child: const Text('OK'),
+                                            child: const Text('Cancel'),
                                           ),
-                                      ],
-                                    ),
-                                  );
+                                          if (biometricsRequired)
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(
+                                                  0xFF2196F3,
+                                                ),
+                                              ),
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                                if (faceEnrolled) {
+                                                  _verifyFaceNow();
+                                                } else {
+                                                  _enrollFaceNow();
+                                                }
+                                              },
+                                              child: Text(
+                                                faceEnrolled
+                                                    ? 'Verify Face'
+                                                    : 'Setup Face ID',
+                                              ),
+                                            )
+                                          else
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(
+                                                  0xFF2196F3,
+                                                ),
+                                              ),
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                                context.go('/home');
+                                              },
+                                              child: const Text('OK'),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  final error = jsonDecode(response.body);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          error['detail'] ??
+                                              'Transaction failed',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
                                 }
-                              } else {
-                                final error = jsonDecode(response.body);
+                              } catch (e) {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text(
-                                        error['detail'] ?? 'Transaction failed',
-                                      ),
+                                      content: Text('Error: ${e.toString()}'),
                                       backgroundColor: Colors.red,
                                     ),
                                   );
                                 }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _verifying = false);
+                                }
                               }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Error: ${e.toString()}'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            } finally {
-                              if (mounted) {
-                                setState(() => _verifying = false);
-                              }
-                            }
-                          },
-                    child: _verifying
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                            },
+                      child: _verifying
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Confirm & Send',
+                              style: TextStyle(
+                                fontFamily: 'InstrumentSans',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                              ),
                             ),
-                          )
-                        : const Text(
-                            'Confirm & Send',
-                            style: TextStyle(
-                              fontFamily: 'InstrumentSans',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

@@ -77,11 +77,9 @@ class ReceiptScreen extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: const Color.fromARGB(255, 2, 101, 250),
           elevation: 0,
+          centerTitle: true,
           leading: IconButton(
-            icon: const Icon(
-              Icons.close,
-              color: Color.fromARGB(255, 245, 245, 245),
-            ),
+            icon: const Icon(Icons.close, color: Colors.white),
             onPressed: () => context.go('/home'),
           ),
           title: const Text(
@@ -89,8 +87,9 @@ class ReceiptScreen extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'InstrumentSans',
               fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color.fromARGB(255, 245, 245, 245),
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+              letterSpacing: -1,
             ),
           ),
           actions: [

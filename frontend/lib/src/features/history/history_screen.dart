@@ -45,7 +45,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // 2. Fetch Transactions
       // Using a larger page size for history
       final txResponse = await http.get(
-        Uri.parse('$transactions_endpoint?page=1&page_size=50'), 
+        Uri.parse('$transactions_endpoint?page=1&page_size=50'),
         headers: authHeaders(),
       );
 
@@ -95,52 +95,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
               letterSpacing: -1,
             ),
           ),
-          leading: null, // No back button on main tab pages usually, but if navigated from "See All", it might need one.
-          // If this is a main tab, we use BottomNavBar.
-          // For consistent navigation, let's assume it's part of the navbar system.
-          automaticallyImplyLeading: false, 
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => context.pop(),
+          ),
         ),
         body: isLoading
             ? const Center(child: CircularProgressIndicator())
             : errorMessage != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(errorMessage!),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadData,
-                          child: const Text('Retry'),
-                        ),
-                      ],
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(errorMessage!),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadData,
+                      child: const Text('Retry'),
                     ),
-                  )
-                : transactions.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No transactions found',
-                          style: TextStyle(
-                            color: Color(0xFF626C7A),
-                            fontSize: 16,
-                            fontFamily: 'InstrumentSans',
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadData,
-                        child: ListView.builder(
-                          itemCount: transactions.length,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          itemBuilder: (context, index) {
-                            return _HistoryItem(
-                              transaction: transactions[index],
-                              currentUserId: currentUserId,
-                            );
-                          },
-                        ),
-                      ),
+                  ],
+                ),
+              )
+            : transactions.isEmpty
+            ? const Center(
+                child: Text(
+                  'No transactions found',
+                  style: TextStyle(
+                    color: Color(0xFF626C7A),
+                    fontSize: 16,
+                    fontFamily: 'InstrumentSans',
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                child: ListView.builder(
+                  itemCount: transactions.length,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  itemBuilder: (context, index) {
+                    return _HistoryItem(
+                      transaction: transactions[index],
+                      currentUserId: currentUserId,
+                    );
+                  },
+                ),
+              ),
         bottomNavigationBar: RoundedNavBar(
           currentIndex: _tab,
           onTap: (i) {
@@ -159,10 +159,7 @@ class _HistoryItem extends StatelessWidget {
   final Map<String, dynamic> transaction;
   final String currentUserId;
 
-  const _HistoryItem({
-    required this.transaction,
-    required this.currentUserId,
-  });
+  const _HistoryItem({required this.transaction, required this.currentUserId});
 
   @override
   Widget build(BuildContext context) {
@@ -177,14 +174,29 @@ class _HistoryItem extends StatelessWidget {
     String formattedDate = 'Unknown date';
     try {
       final dt = DateTime.parse(timestamp);
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       final hour = dt.hour > 12 ? dt.hour - 12 : dt.hour;
       final period = dt.hour >= 12 ? 'PM' : 'AM';
-      formattedDate = '${months[dt.month - 1]} ${dt.day}, $hour:${dt.minute.toString().padLeft(2, '0')} $period';
+      formattedDate =
+          '${months[dt.month - 1]} ${dt.day}, $hour:${dt.minute.toString().padLeft(2, '0')} $period';
     } catch (_) {}
 
     final icon = isPositive ? Icons.arrow_downward : Icons.arrow_upward;
-    final title = transaction['description'] ?? (isPositive ? 'Received' : 'Sent');
+    final title =
+        transaction['description'] ?? (isPositive ? 'Received' : 'Sent');
     final amountStr = '${isPositive ? '+' : '-'}৳${amount.toStringAsFixed(2)}';
 
     return Container(
