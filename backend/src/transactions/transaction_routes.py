@@ -7,6 +7,7 @@ from sqlmodel import Session
 from typing import List
 from uuid import UUID
 
+import sys
 from ..auth.auth_service import get_current_user
 from ..models.user import User
 from ..models.transaction import Transaction
@@ -34,7 +35,26 @@ from ..utils.fraud_detector import check_fraudulent_activity
 from ..utils.groq_message_enhancer import enhance_risk_message
 from ..config import settings
 from ..schemas.anomaly_schemas import RawTransaction, RawPredictionResponse
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+
+def is_face_verified_recently(user: User, window_minutes: int = 5) -> bool:
+    """Check if the user has successfully verified their face in the last X minutes."""
+    if not user.last_face_verified_at:
+        return False
+    
+    now = datetime.now(timezone.utc)
+    last_verified = user.last_face_verified_at
+    
+    # Ensure TZ-aware comparison
+    if last_verified.tzinfo is None:
+        last_verified = last_verified.replace(tzinfo=timezone.utc)
+    
+    diff = (now - last_verified)
+    is_recent = diff < timedelta(minutes=window_minutes)
+    
+    print(f"DEBUG [FACE-CHECK] user={user.id}, now={now}, last={last_verified}, diff={diff}, is_recent={is_recent}", file=sys.stderr)
+    return is_recent
 
 
 router = APIRouter()
@@ -438,8 +458,10 @@ async def preview_transaction(
             )
         
         # Rule-based check (always execute)
+        is_face_verified = is_face_verified_recently(current_user)
         rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
-            session, current_user.id, float(preview_request.amount)
+            session, current_user.id, float(preview_request.amount),
+            record_alert=not is_face_verified
         )
 
         # Run XGBoost fraud check
@@ -466,7 +488,13 @@ async def preview_transaction(
             }
             rule_score = severity_scores.get(rule_severity, 0.85)
             # Only block for medium and above; allow low severity with warning
-            can_proceed = rule_severity == "low"
+            # Also allow proceeding if face was verified recently (biometric bypass)
+            is_face_verified = is_face_verified_recently(current_user)
+            can_proceed = (rule_severity == "low") or is_face_verified
+            
+            if is_face_verified and rule_severity != "low":
+                print(f"⚠️ [PREVIEW-BYPASS] Fraud Rule '{rule_reason}' (severity={rule_severity}) "
+                      f"bypassed for user {current_user.id} during preview due to face verification", file=sys.stderr)
             
             # Enhance message with Groq if available
             enhanced_reason = await enhance_risk_message(
@@ -484,7 +512,13 @@ async def preview_transaction(
                 threshold=0.5,
                 can_proceed=can_proceed,
                 warnings=warnings,
-                details={"rule": rule_reason, "severity": rule_severity, "model": details},
+                details={
+                    "rule": rule_reason, 
+                    "severity": rule_severity, 
+                    "model": details,
+                    "biometrics_required": rule_severity != "low" and not is_face_verified,
+                    "face_enrolled": bool(current_user.face_image_path)
+                },
             )
             # Even when flagged, show accurate fee/VAT so the UI reflects costs
             flagged_fee = round(float(preview_request.amount) * (10 / 1000), 2)
@@ -500,7 +534,7 @@ async def preview_transaction(
                 total_deducted=flagged_total,
                 new_balance=current_user.wallet_balance - flagged_total,
                 risk_check=risk_check,
-                can_proceed=False,
+                can_proceed=can_proceed,
             )
 
         # Determine risk level based on fraud probability
@@ -521,8 +555,12 @@ async def preview_transaction(
             warnings.append("Moderate fraud risk detected")
         
         # Determine if can proceed
-        can_proceed = not is_fraud or not settings.BLOCK_ML_ANOMALY
+        is_face_verified = is_face_verified_recently(current_user)
+        can_proceed_ml = not is_fraud or not settings.BLOCK_ML_ANOMALY
+        can_proceed = can_proceed_ml or is_face_verified
         
+        if is_fraud and is_face_verified:
+             print(f"⚠️ [PREVIEW-BYPASS] ML Fraud detected bypassed for user {current_user.id} during preview", file=sys.stderr)
         # Calculate fees: ৳10/1000 fee and ৳5/1000 VAT
         fee = round(float(preview_request.amount) * (10 / 1000), 2)
         vat = round(float(preview_request.amount) * (5 / 1000), 2)
@@ -536,7 +574,11 @@ async def preview_transaction(
             threshold=0.5,  # Standard threshold for binary classification
             can_proceed=can_proceed,
             warnings=warnings,
-            details=details
+            details={
+                "model_details": details,
+                "biometrics_required": is_fraud and not is_face_verified,
+                "face_enrolled": bool(current_user.face_image_path)
+            }
         )
         
         return TransactionPreviewResponse(
@@ -587,8 +629,10 @@ async def confirm_transaction(
         )
         
         # Rule-based pre-check
+        is_face_verified = is_face_verified_recently(current_user, window_minutes=5)
         rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
-            session, current_user.id, float(send_request.amount)
+            session, current_user.id, float(send_request.amount),
+            record_alert=not is_face_verified
         )
         if rule_flagged:
             # Map severity to risk score with more granular levels
@@ -603,26 +647,33 @@ async def confirm_transaction(
             rule_score = severity_scores.get(rule_severity, 0.85)
             # Only block for medium and above
             if rule_severity != "low":
-                # Enhance message with Groq if available
-                enhanced_reason = await enhance_risk_message(
-                    risk_level="high",
-                    severity=rule_severity,
-                    original_reason=rule_reason,
-                    amount=float(send_request.amount),
-                    risk_score=rule_score,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={
-                        "warning": {
-                            "flagged": True,
-                            "reason": enhanced_reason,
-                            "fraud_probability": rule_score,
-                            "threshold": 0.5,
-                            "details": {"rule": rule_reason, "severity": rule_severity},
-                        }
-                    },
-                )
+                # Check for biometric bypass
+                if is_face_verified:
+                    print(f"⚠️ [BYPASS] Fraud Rule '{rule_reason}' (severity={rule_severity}) "
+                          f"bypassed for user {current_user.id} due to recent face verification", file=sys.stderr)
+                else:
+                    # Enhance message with Groq if available
+                    enhanced_reason = await enhance_risk_message(
+                        risk_level="high",
+                        severity=rule_severity,
+                        original_reason=rule_reason,
+                        amount=float(send_request.amount),
+                        risk_score=rule_score,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "warning": {
+                                "flagged": True,
+                                "reason": enhanced_reason,
+                                "fraud_probability": rule_score,
+                                "threshold": 0.5,
+                                "biometrics_required": True,
+                                "face_enrolled": bool(current_user.face_image_path),
+                                "details": {"rule": rule_reason, "severity": rule_severity},
+                            }
+                        },
+                    )
 
         # Find receiver by phone
         receiver = UserService.get_user_by_phone(session, send_request.receiver_phone)
@@ -638,22 +689,32 @@ async def confirm_transaction(
         )
         
         if is_fraud and settings.BLOCK_ML_ANOMALY:
-            # Block transaction
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "warning": {
-                        "flagged": True,
-                        "reason": "Transaction flagged as potentially fraudulent by ML model",
-                        "fraud_probability": fraud_prob,
-                        "threshold": 0.5,
-                        "details": details,
-                    }
-                },
-            )
+            # Check for biometric bypass
+            if is_face_verified:
+                print(f"⚠️ [BYPASS] ML Fraud detected (prob={fraud_prob:.2f}) "
+                      f"bypassed for user {current_user.id} due to recent face verification", file=sys.stderr)
+            else:
+                # Block transaction
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "warning": {
+                            "flagged": True,
+                            "reason": "Transaction flagged as potentially fraudulent by ML model",
+                            "fraud_probability": fraud_prob,
+                            "threshold": 0.5,
+                            "biometrics_required": True,
+                            "face_enrolled": bool(current_user.face_image_path),
+                            "details": details,
+                        }
+                    },
+                )
         
         # Execute the transaction
-        transaction = WalletService.send_money(session, current_user, send_request)
+        transaction = WalletService.send_money(
+            session, current_user, send_request, 
+            face_verified=is_face_verified
+        )
         
         # Build warning if fraud detected but not blocking
         warning = None
@@ -703,8 +764,10 @@ async def send_money(
     """
     try:
         # Rule-based pre-check
+        is_face_verified = is_face_verified_recently(current_user, window_minutes=5)
         rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
-            session, current_user.id, float(send_request.amount)
+            session, current_user.id, float(send_request.amount),
+            record_alert=not is_face_verified
         )
         if rule_flagged:
             # Map severity to risk score with more granular levels
@@ -719,26 +782,33 @@ async def send_money(
             rule_score = severity_scores.get(rule_severity, 0.85)
             # Only block for medium and above
             if rule_severity != "low":
-                # Enhance message with Groq if available
-                enhanced_reason = await enhance_risk_message(
-                    risk_level="high",
-                    severity=rule_severity,
-                    original_reason=rule_reason,
-                    amount=float(send_request.amount),
-                    risk_score=rule_score,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={
-                        "warning": {
-                            "flagged": True,
-                            "reason": enhanced_reason,
-                            "fraud_probability": rule_score,
-                            "threshold": 0.5,
-                            "details": {"rule": rule_reason, "severity": rule_severity},
-                        }
-                    },
-                )
+                # Check for biometric bypass
+                if is_face_verified:
+                    print(f"⚠️ [BYPASS] Fraud Rule '{rule_reason}' (severity={rule_severity}) "
+                          f"bypassed for user {current_user.id} due to recent face verification", file=sys.stderr)
+                else:
+                    # Enhance message with Groq if available
+                    enhanced_reason = await enhance_risk_message(
+                        risk_level="high",
+                        severity=rule_severity,
+                        original_reason=rule_reason,
+                        amount=float(send_request.amount),
+                        risk_score=rule_score,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "warning": {
+                                "flagged": True,
+                                "reason": enhanced_reason,
+                                "fraud_probability": rule_score,
+                                "threshold": 0.5,
+                                "biometrics_required": True,
+                                "face_enrolled": bool(current_user.face_image_path),
+                                "details": {"rule": rule_reason, "severity": rule_severity},
+                            }
+                        },
+                    )
 
         # XGBoost ML pre-check (fails open if artifacts missing)
         receiver = UserService.get_user_by_phone(session, send_request.receiver_phone)
@@ -753,21 +823,31 @@ async def send_money(
         )
 
         if is_fraud and settings.BLOCK_ML_ANOMALY:
-            # Block transaction with clear 409 response
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "warning": {
-                        "flagged": True,
-                        "reason": "Transaction flagged as potentially fraudulent by ML model",
-                        "fraud_probability": fraud_prob,
-                        "threshold": 0.5,
-                        "details": details,
-                    }
-                },
-            )
+            # Check for biometric bypass
+            if is_face_verified:
+                print(f"⚠️ [BYPASS] ML Fraud detected (prob={fraud_prob:.2f}) "
+                      f"bypassed for user {current_user.id} due to recent face verification", file=sys.stderr)
+            else:
+                # Block transaction with clear 409 response
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "warning": {
+                            "flagged": True,
+                            "reason": "Transaction flagged as potentially fraudulent by ML model",
+                            "fraud_probability": fraud_prob,
+                            "threshold": 0.5,
+                            "biometrics_required": True,
+                            "face_enrolled": bool(current_user.face_image_path),
+                            "details": details,
+                        }
+                    },
+                )
 
-        transaction = WalletService.send_money(session, current_user, send_request)
+        transaction = WalletService.send_money(
+            session, current_user, send_request,
+            face_verified=is_face_verified
+        )
         
         # Wrap response and include a warning (non-blocking) when flagged
         warning = None

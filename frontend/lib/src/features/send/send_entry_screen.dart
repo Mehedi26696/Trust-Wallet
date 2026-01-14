@@ -632,6 +632,9 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
                               final riskCheck = data['risk_check'];
                               final riskScore =
                                   (riskCheck['risk_score'] ?? 0.0) as num;
+                              final riskDetails = riskCheck['details'] ?? {};
+                              final biometricsRequired = riskDetails['biometrics_required'] == true;
+                              final faceEnrolled = riskDetails['face_enrolled'] == true;
 
                               final backendFee = (data['fee'] as num?) ?? 0;
                               final backendVat = (data['vat'] as num?) ?? 0;
@@ -645,6 +648,8 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
                                   'reason': riskCheck['warnings'].isEmpty
                                       ? 'Normal transaction'
                                       : riskCheck['warnings'][0],
+                                  'biometrics_required': biometricsRequired,
+                                  'face_enrolled': faceEnrolled,
                                 };
                                 feeData = {
                                   'vat': backendVat,
@@ -700,53 +705,55 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
                                 // Continue to confirm screen; final send will be blocked if server enforces
                               }
 
-                              // If high risk or medium risk with score > 50%, show warning
-                              final scorePercent = riskScore * 100;
+                              // If high risk or biometrics required, show warning
 
-                              if (riskCheck['risk_level'] == 'high' ||
-                                  scorePercent > 50) {
-                                await showDialog<void>(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    title: Text(
-                                      scorePercent > 50
-                                          ? 'Face Verification Required'
-                                          : 'High Risk Detected',
-                                      style: const TextStyle(
-                                        fontFamily: 'InstrumentSans',
-                                        fontWeight: FontWeight.bold,
+                              if (riskCheck['risk_level'] == 'high' || biometricsRequired) {
+                                if (mounted) {
+                                  await showDialog<void>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
-                                    ),
-                                    content: Text(
-                                      scorePercent > 50
-                                          ? '${riskCheck['warnings'].join('\n')}\n\nYou will need to verify your face on the next screen to complete this transaction.'
-                                          : riskCheck['warnings'].join('\n'),
-                                      style: const TextStyle(
-                                        fontFamily: 'InstrumentSans',
-                                      ),
-                                    ),
-                                    actions: [
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(
-                                            0xFF2196F3,
-                                          ),
-                                        ),
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text(
-                                          'Continue',
-                                          style: TextStyle(
-                                            fontFamily: 'InstrumentSans',
-                                          ),
+                                      title: Text(
+                                        biometricsRequired
+                                            ? (faceEnrolled ? 'Face Verification Required' : 'Setup Face ID Required')
+                                            : 'High Risk Detected',
+                                        style: const TextStyle(
+                                          fontFamily: 'InstrumentSans',
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                );
-                                // Do not block; continue to confirm where face verification is enforced
+                                      content: Text(
+                                        biometricsRequired
+                                            ? (faceEnrolled 
+                                                ? '${riskCheck['warnings'].join('\n')}\n\nYou will need to verify your face on the next screen to complete this transaction.'
+                                                : '${riskCheck['warnings'].join('\n')}\n\nYou haven\'t set up Face ID yet. You will need to enroll your face on the next screen to proceed with this high-value transfer.')
+                                            : riskCheck['warnings'].join('\n'),
+                                        style: const TextStyle(
+                                          fontFamily: 'InstrumentSans',
+                                        ),
+                                      ),
+                                      actions: [
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFF2196F3,
+                                            ),
+                                          ),
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text(
+                                            'Continue',
+                                            style: TextStyle(
+                                              fontFamily: 'InstrumentSans',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                // Do not block; continue to confirm where face verification/enrollment is enforced
                               }
 
                               // Navigate to confirmation screen with preview data

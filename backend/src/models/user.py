@@ -20,6 +20,7 @@ class User(SQLModel, table=True):
     # Face enrollment
     face_image_path: Optional[str] = Field(default=None, max_length=512, sa_column_kwargs={"nullable": True})
     face_hash: Optional[str] = Field(default=None, max_length=128, sa_column_kwargs={"nullable": True})
+    last_face_verified_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"nullable": True})
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = Field(default=True)

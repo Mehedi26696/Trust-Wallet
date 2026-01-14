@@ -3,6 +3,8 @@ Wallet service for handling wallet and transaction operations.
 """
 
 from sqlmodel import Session, select
+from ..config import settings
+import sys
 from typing import List
 from fastapi import HTTPException, status
 from datetime import datetime, timezone
@@ -47,7 +49,8 @@ class WalletService:
     def send_money(
         session: Session, 
         sender: User, 
-        send_request: WalletSendRequest
+        send_request: WalletSendRequest,
+        face_verified: bool = False
     ) -> Transaction:
         """
         Send money from one user to another.
@@ -63,11 +66,11 @@ class WalletService:
         Raises:
             HTTPException: If validation fails or transaction is blocked
         """
-        # Check if sender is blocked
-        if is_user_blocked(session, sender.id):
+        # Check if sender is blocked (skip if face verified recently)
+        if not face_verified and is_user_blocked(session, sender.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account temporarily blocked due to suspicious activity"
+                detail="Account temporarily blocked due to suspicious activity. Please verify your face to unblock."
             )
         
         # Find receiver by phone number
@@ -105,14 +108,39 @@ class WalletService:
         
         # Check for fraud (rule-based)
         is_fraudulent, fraud_reason, rule_severity = check_fraudulent_activity(
-            session, sender.id, float(send_request.amount), receiver_id=receiver.id
+            session, sender.id, float(send_request.amount), 
+            receiver_id=receiver.id,
+            record_alert=not face_verified
         )
         
         if is_fraudulent:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Transaction flagged: {fraud_reason}"
-            )
+            # ALLOW 'low' severity transactions smoothly without face verify
+            if rule_severity == "low":
+                 print(f"ℹ️ [INFO] Transaction flagged as '{rule_severity}' risk, allowing without face verify.", file=sys.stderr)
+            
+            # BYPASS restricted rules if face was verified recently
+            elif face_verified:
+                 if rule_severity == "critical":
+                     raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Transaction blocked: {fraud_reason} (Critical risk requires manual review)"
+                     )
+                 print(f"⚠️ [SERVICE-BYPASS] Fraud Rule '{fraud_reason}' bypassed via face verification", file=sys.stderr)
+            
+            # BLOCK for medium/high if no face verify
+            else:
+                 raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "warning": {
+                            "flagged": True,
+                            "reason": f"Transaction flagged: {fraud_reason}",
+                            "biometrics_required": True,
+                            "face_enrolled": bool(sender.face_image_path),
+                            "details": {"rule": fraud_reason, "severity": rule_severity}
+                        }
+                    }
+                 )
         
         # Perform transaction
         try:

@@ -176,7 +176,10 @@ class SupabaseClient:
             return client.storage.from_(bucket).upload(
                 path=path,
                 file=file,
-                file_options={"content-type": content_type, "upsert": True}
+                file_options={
+                    "content-type": content_type,
+                    "x-upsert": "true"
+                }
             )
         except Exception as e:
             print(f"❌ Failed to upload file to Supabase storage: {e}")

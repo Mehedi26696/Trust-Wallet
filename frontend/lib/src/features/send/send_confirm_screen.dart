@@ -80,8 +80,61 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
     }
   }
 
-  // Check if face verification required based on risk score
-  bool _needsStepUp(dynamic scoreStr) {
+  Future<void> _enrollFaceNow() async {
+    final picker = ImagePicker();
+    final img = await picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.front,
+      imageQuality: 85,
+    );
+    if (img == null) return;
+
+    try {
+      final req = http.MultipartRequest(
+        'POST',
+        Uri.parse(enroll_face_endpoint),
+      );
+      req.headers['Authorization'] = 'Bearer $authToken';
+      req.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          img.path,
+          filename: 'face.jpg',
+        ),
+      );
+      final resp = await req.send();
+      if (resp.statusCode == 200) {
+        setState(() => _faceVerified = true); // Enrolling also counts as verified for this session
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Face enrolled successfully'),
+            backgroundColor: Color(0xFF4CAF50),
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Face enrollment failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error during face enrollment'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Check if face verification required based on risk score or explicit signal
+  bool _needsStepUp(dynamic scoreStr, Map risk) {
+    if (risk['biometrics_required'] == true) return true;
     // Parse score string (could be "75.0" or "75" or number)
     final scoreNum = num.tryParse(scoreStr.toString()) ?? 0;
     // Require face verification if risk score > 50%
@@ -134,7 +187,8 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
 
     final previewData = data['previewData'] as Map<String, dynamic>?;
 
-    final needsStepUp = _needsStepUp(score);
+    final needsStepUp = _needsStepUp(score, risk);
+    final isEnrolled = risk['face_enrolled'] == true;
     final now = DateTime.now();
     final timeFormat = DateFormat('hh:mm a');
 
@@ -401,18 +455,20 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'High risk detected ($score%). Verify your face to proceed.',
+                        needsStepUp && !isEnrolled
+                            ? 'Face enrollment required to proceed with this transfer.'
+                            : 'High risk detected ($score%). Verify your face to proceed.',
                         style: const TextStyle(color: Color(0xFFE65100)),
                       ),
                     ),
                     if (!_faceVerified)
                       TextButton(
-                        onPressed: _verifyFaceNow,
+                        onPressed: isEnrolled ? _verifyFaceNow : _enrollFaceNow,
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white,
                           backgroundColor: const Color(0xFF1976D2),
                         ),
-                        child: const Text('Verify Face'),
+                        child: Text(isEnrolled ? 'Verify Face' : 'Setup Face'),
                       )
                     else
                       const Icon(Icons.verified, color: Color(0xFF4CAF50)),
@@ -688,30 +744,46 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                                   ),
                                 );
                               } else if (response.statusCode == 409) {
-                                // Transaction blocked by ML
+                                // Transaction blocked by Fraud Detection
                                 final error = jsonDecode(response.body);
                                 final warning = error['detail']['warning'];
+                                final biometricsRequired =
+                                    warning['biometrics_required'] == true;
+                                final faceEnrolled =
+                                    warning['face_enrolled'] == true;
+
                                 if (mounted) {
                                   showDialog(
                                     context: context,
+                                    barrierDismissible: false,
                                     builder: (_) => AlertDialog(
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(
+                                          16,
+                                        ),
                                       ),
-                                      title: const Text(
-                                        'Transaction Blocked',
+                                      title: Text(
+                                        biometricsRequired
+                                            ? 'Verification Required'
+                                            : 'Transaction Blocked',
                                         style: TextStyle(
                                           fontFamily: 'InstrumentSans',
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFFD32F2F),
+                                          color: biometricsRequired
+                                              ? const Color(0xFFE65100)
+                                              : const Color(0xFFD32F2F),
                                         ),
                                       ),
                                       content: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(
-                                            Icons.block,
-                                            color: Color(0xFFD32F2F),
+                                          Icon(
+                                            biometricsRequired
+                                                ? Icons.face_unlock_rounded
+                                                : Icons.block,
+                                            color: biometricsRequired
+                                                ? const Color(0xFFE65100)
+                                                : const Color(0xFFD32F2F),
                                             size: 48,
                                           ),
                                           const SizedBox(height: 16),
@@ -722,26 +794,60 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                                             ),
                                             textAlign: TextAlign.center,
                                           ),
+                                          if (biometricsRequired) ...[
+                                            const SizedBox(height: 20),
+                                            const Text(
+                                              'To secure this account, we need to verify your identity before proceeding.',
+                                              style: TextStyle(
+                                                fontFamily: 'InstrumentSans',
+                                                fontSize: 12,
+                                                color: Colors.grey,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ],
                                         ],
                                       ),
                                       actions: [
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(
-                                              0xFF2196F3,
-                                            ),
-                                          ),
+                                        TextButton(
                                           onPressed: () {
                                             Navigator.pop(context);
                                             context.go('/home');
                                           },
-                                          child: const Text(
-                                            'OK',
-                                            style: TextStyle(
-                                              fontFamily: 'InstrumentSans',
-                                            ),
-                                          ),
+                                          child: const Text('Cancel'),
                                         ),
+                                        if (biometricsRequired)
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  const Color(0xFF2196F3),
+                                            ),
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              if (faceEnrolled) {
+                                                _verifyFaceNow();
+                                              } else {
+                                                _enrollFaceNow();
+                                              }
+                                            },
+                                            child: Text(
+                                              faceEnrolled
+                                                  ? 'Verify Face'
+                                                  : 'Setup Face ID',
+                                            ),
+                                          )
+                                        else
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  const Color(0xFF2196F3),
+                                            ),
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              context.go('/home');
+                                            },
+                                            child: const Text('OK'),
+                                          ),
                                       ],
                                     ),
                                   );

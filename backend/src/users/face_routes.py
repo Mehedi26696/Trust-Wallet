@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlmodel import Session
 from typing import Optional
 import os
+import sys
 from PIL import Image
 
 # DeepFace for state-of-the-art face recognition
@@ -53,8 +54,6 @@ async def enroll_face(
     Enroll user's face image. Stores the image and a perceptual hash for basic matching.
     Accepts multipart/form-data with field name 'file'.
     """
-    import sys
-    print(f"DeepFace available: {HAS_DEEPFACE}", file=sys.stderr)
     
     # Debug logging
     print(f"Face enrollment request: user={current_user.id}, content_type={file.content_type}", file=sys.stderr)
@@ -188,6 +187,22 @@ async def verify_face(
             
             is_verified = result.get("verified", False)
             distance = result.get("distance", 999)
+            
+            if is_verified:
+                from datetime import datetime, timezone
+                from ..utils.fraud_detector import clear_user_fraud_block
+                
+                current_user.last_face_verified_at = datetime.now(timezone.utc)
+                session.add(current_user)
+                
+                # Resolve pending fraud alerts to unblock the account
+                cleared = clear_user_fraud_block(session, current_user.id)
+                if cleared:
+                    print(f"✅ [UNBLOCK] Resolved fraud alerts for user {current_user.id} after face success", file=sys.stderr)
+                
+                session.commit()
+                print(f"Face verified for user {current_user.id}, updating last_face_verified_at", file=sys.stderr)
+                
             return {"verified": is_verified, "distance": float(distance), "method": "deepface"}
         except Exception as e:
             print(f"DeepFace error: {e}", file=sys.stderr)
