@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
 from sqlmodel import Session
-from typing import Optional
+
 import os
 import sys
 from PIL import Image
@@ -20,29 +20,10 @@ from ..utils.supabase_client import supabase_client
 router = APIRouter()
 
 
-def _faces_dir() -> str:
-    """Get or create the faces directory. Returns absolute path."""
-    # Go from backend/src/users to backend root
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    path = os.path.join(base_dir, "backend", "media", "faces")
-    os.makedirs(path, exist_ok=True)
-    return path
 
 
-def _get_face_embedding(image_path: str) -> Optional[dict]:
-    """Get face embedding using DeepFace.
-    Returns embedding dict with 'embedding' key or None if face not found.
-    """
-    if not HAS_DEEPFACE:
-        return None
-    try:
-        # Use Facenet512 model for robust embeddings
-        embedding = DeepFace.represent(img_path=image_path, model_name="Facenet512", enforce_detection=True)
-        if embedding and len(embedding) > 0:
-            return embedding[0]  # Returns dict with 'embedding' key
-        return None
-    except Exception:
-        return None
+
+
 
 @router.post("/face/enroll")
 async def enroll_face(

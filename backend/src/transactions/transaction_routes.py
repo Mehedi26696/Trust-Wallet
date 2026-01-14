@@ -4,7 +4,7 @@ Transaction API routes for managing money transfers and transaction history.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel import Session
-from typing import List
+
 from uuid import UUID
 
 import sys
@@ -34,7 +34,7 @@ from ..utils.xgboost_fraud_detector import xgboost_fraud_check
 from ..utils.fraud_detector import check_fraudulent_activity
 from ..utils.groq_message_enhancer import enhance_risk_message
 from ..config import settings
-from ..schemas.anomaly_schemas import RawTransaction, RawPredictionResponse
+
 from datetime import datetime, timezone, timedelta
 
 

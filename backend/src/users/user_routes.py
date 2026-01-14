@@ -6,7 +6,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 from uuid import UUID
-import json
+
 
 from ..auth.auth_service import (
     authenticate_user, 
@@ -18,7 +18,7 @@ from ..schemas.user_schemas import UserCreate, UserLogin, UserResponse, UserProf
 from ..schemas.auth_schemas import Token
 from ..services.user_service import UserService
 from ..utils.database import get_session
-from ..utils.fraud_detector import clear_user_fraud_block
+
 from ..config import settings
 
 
