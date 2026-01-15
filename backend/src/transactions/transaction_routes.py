@@ -31,7 +31,7 @@ from ..services.wallet_service import WalletService
 from ..services.user_service import UserService
 from ..utils.database import get_session
 from ..utils.xgboost_fraud_detector import xgboost_fraud_check
-from ..utils.fraud_detector import check_fraudulent_activity
+from ..utils.fraud_detector import check_fraudulent_activity, is_user_blocked
 from ..utils.groq_message_enhancer import enhance_risk_message
 from ..config import settings
 
@@ -292,6 +292,25 @@ async def check_transaction_risk(
             session, current_user.id, float(risk_request.amount)
         )
 
+        # Check for account block (Suspicious Activity)
+        is_blocked = is_user_blocked(session, current_user.id)
+        is_face_verified = is_face_verified_recently(current_user)
+
+        if is_blocked and not is_face_verified:
+            return RiskCheckResponse(
+                risk_level="high",
+                risk_score=0.95,
+                threshold=0.5,
+                can_proceed=False,
+                warnings=["Account blocked due to suspicious activity. Verify face to proceed."],
+                details={
+                    "rule": "Account Blocked", 
+                    "severity": "critical", 
+                    "biometrics_required": True,
+                    "face_enrolled": bool(current_user.face_image_path)
+                }
+            )
+
         # Run XGBoost fraud check
         is_fraud, fraud_prob, details = xgboost_fraud_check(
             session,
@@ -334,7 +353,13 @@ async def check_transaction_risk(
                 threshold=0.5,
                 can_proceed=can_proceed,
                 warnings=warnings,
-                details={"rule": rule_reason, "severity": rule_severity, "model": details},
+                details={
+                    "rule": rule_reason, 
+                    "severity": rule_severity, 
+                    "model": details,
+                    "biometrics_required": rule_severity != "low" and not is_face_verified_recently(current_user),
+                    "face_enrolled": bool(current_user.face_image_path)
+                },
             )
 
         # If model failed internally and returned fail-open defaults, use a heuristic fallback
@@ -388,7 +413,11 @@ async def check_transaction_risk(
             threshold=0.5,
             can_proceed=can_proceed,
             warnings=warnings,
-            details=details
+            details={
+                "model_details": details,
+                "biometrics_required": is_fraud and not is_face_verified_recently(current_user),
+                "face_enrolled": bool(current_user.face_image_path)
+            }
         )
     
     except HTTPException:
@@ -459,6 +488,41 @@ async def preview_transaction(
         
         # Rule-based check (always execute)
         is_face_verified = is_face_verified_recently(current_user)
+        
+        # Check for account block (Suspicious Activity)
+        is_blocked = is_user_blocked(session, current_user.id)
+        if is_blocked and not is_face_verified:
+            # Force critical risk response
+            flagged_fee = round(float(preview_request.amount) * (10 / 1000), 2)
+            flagged_vat = round(float(preview_request.amount) * (5 / 1000), 2)
+            flagged_total = float(preview_request.amount) + flagged_fee + flagged_vat
+            
+            risk_check = RiskCheckResponse(
+                risk_level="high",
+                risk_score=0.95,
+                threshold=0.5,
+                can_proceed=False,
+                warnings=["Account blocked due to suspicious activity. Verify face to proceed."],
+                details={
+                    "rule": "Account Blocked", 
+                    "severity": "critical", 
+                    "biometrics_required": True,
+                    "face_enrolled": bool(current_user.face_image_path)
+                }
+            )
+            return TransactionPreviewResponse(
+                sender_balance=current_user.wallet_balance,
+                receiver_name=receiver.full_name,
+                receiver_phone=receiver.phone_number or preview_request.receiver_phone,
+                amount=preview_request.amount,
+                fee=flagged_fee,
+                vat=flagged_vat,
+                total_deducted=flagged_total,
+                new_balance=current_user.wallet_balance - flagged_total,
+                risk_check=risk_check,
+                can_proceed=False,
+            )
+
         rule_flagged, rule_reason, rule_severity = check_fraudulent_activity(
             session, current_user.id, float(preview_request.amount),
             record_alert=not is_face_verified

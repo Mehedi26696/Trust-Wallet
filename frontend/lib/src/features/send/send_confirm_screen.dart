@@ -24,6 +24,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
 
   bool _verifying = false;
   bool _faceVerified = false;
+  bool _isFaceLoading = false;
 
   Future<void> _verifyFaceNow() async {
     final picker = ImagePicker();
@@ -34,6 +35,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
     );
     if (img == null) return;
 
+    setState(() => _isFaceLoading = true);
     try {
       final req = http.MultipartRequest(
         'POST',
@@ -77,6 +79,8 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isFaceLoading = false);
     }
   }
 
@@ -89,6 +93,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
     );
     if (img == null) return;
 
+    setState(() => _isFaceLoading = true);
     try {
       final req = http.MultipartRequest(
         'POST',
@@ -131,6 +136,8 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isFaceLoading = false);
     }
   }
 
@@ -226,7 +233,9 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
             ),
           ),
         ),
-        body: SingleChildScrollView(
+        body: Stack(
+          children: [
+            SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,7 +442,7 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '$reason — ($score)',
+                        '$reason — ($score%)',
                         style: TextStyle(
                           color: _riskColor(level),
                           fontWeight: FontWeight.w700,
@@ -488,9 +497,16 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
                             foregroundColor: Colors.white,
                             backgroundColor: const Color(0xFF1976D2),
                           ),
-                          child: Text(
-                            isEnrolled ? 'Verify Face' : 'Setup Face',
-                          ),
+                          child: _isFaceLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(isEnrolled ? 'Verify Face' : 'Setup Face'),
                         )
                       else
                         const Icon(Icons.verified, color: Color(0xFF4CAF50)),
@@ -934,7 +950,31 @@ class _SendConfirmScreenState extends State<SendConfirmScreen> {
               const SizedBox(height: 20),
             ],
           ),
-        ),
+            ),
+        if (_isFaceLoading)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 16),
+                  Text(
+                    'Verifying...',
+                    style: TextStyle(
+                      fontFamily: 'InstrumentSans',
+                      color: Colors.white,
+                      fontSize: 16,
+                      decoration: TextDecoration.none,
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
       ),
     );
   }

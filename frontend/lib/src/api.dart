@@ -1,5 +1,6 @@
-String BASE_URL_LOCAL = "https://trust-wallet-mzcq.onrender.com";
+// String BASE_URL_LOCAL = "https://trust-wallet-mzcq.onrender.com";
 
+String BASE_URL_LOCAL = "http://10.141.27.83:8000";
 // Auth endpoints
 String login_endpoint = BASE_URL_LOCAL + "/api/v1/login";
 String signup_endpoint = BASE_URL_LOCAL + "/api/v1/register";

@@ -106,6 +106,10 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
         final score01 = (data['risk_score'] ?? 0.0) as num; // 0..1
         final warnings =
             (data['warnings'] as List?)?.cast<dynamic>() ?? const [];
+        final details = (data['details'] as Map?) ?? {};
+        final biometricsRequired = details['biometrics_required'] == true;
+        final faceEnrolled = details['face_enrolled'] == true;
+
         final reason = warnings.isNotEmpty
             ? warnings.first.toString()
             : (level == 'high' ? 'High fraud risk detected' : 'Normal');
@@ -115,6 +119,8 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
             'level': level,
             'score': (score01 * 100).toStringAsFixed(1), // Show one decimal
             'reason': reason,
+            'biometrics_required': biometricsRequired,
+            'face_enrolled': faceEnrolled,
           };
         });
         return;
@@ -200,39 +206,27 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
   @override
   Widget build(BuildContext context) {
     // Everything below matches your current frontend layout/styles.
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color.fromARGB(255, 151, 212, 255), // Sky blue at bottom
-            Colors.white, // White at top
-          ],
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        backgroundColor: const Color.fromARGB(255, 2, 101, 250),
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.go('/home'),
+        ),
+        title: const Text(
+          'Send Money',
+          style: TextStyle(
+            fontFamily: 'InstrumentSans',
+            fontSize: 22,
+            fontWeight: FontWeight.w500,
+            color: Colors.white,
+          ),
         ),
       ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Color.fromARGB(255, 2, 101, 250),
-          elevation: 0,
-          centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.go('/home'),
-          ),
-          title: const Text(
-            'Send Money',
-            style: TextStyle(
-              fontFamily: 'InstrumentSans',
-              fontSize: 22,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-              letterSpacing: -1,
-            ),
-          ),
-        ),
-        body: SingleChildScrollView(
+      body: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -547,18 +541,17 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
                                 final backendTotal =
                                     (data['total_deducted'] as num?) ??
                                     (amountValue + backendFee + backendVat);
+                                final finalRiskData = {
+                                  'level': riskCheck['risk_level'],
+                                  'score': (riskScore * 100).toStringAsFixed(1),
+                                  'reason': riskCheck['warnings'].isEmpty
+                                      ? 'Normal transaction'
+                                      : riskCheck['warnings'][0],
+                                  'biometrics_required': biometricsRequired,
+                                  'face_enrolled': faceEnrolled,
+                                };
                                 setState(() {
-                                  riskData = {
-                                    'level': riskCheck['risk_level'],
-                                    'score': (riskScore * 100).toStringAsFixed(
-                                      1,
-                                    ),
-                                    'reason': riskCheck['warnings'].isEmpty
-                                        ? 'Normal transaction'
-                                        : riskCheck['warnings'][0],
-                                    'biometrics_required': biometricsRequired,
-                                    'face_enrolled': faceEnrolled,
-                                  };
+                                  riskData = finalRiskData;
                                   feeData = {
                                     'vat': backendVat,
                                     'fee': backendFee,
@@ -687,7 +680,7 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
                                       ).toStringAsFixed(0),
                                       'receiverName': data['receiver_name'],
                                       'fees': feeData,
-                                      'risk': riskData,
+                                      'risk': finalRiskData,
                                       'previewData': _previewData,
                                     },
                                   );
@@ -766,7 +759,6 @@ class _SendEntryScreenState extends State<SendEntryScreen> {
               ],
             ),
           ),
-        ),
       ),
     );
   }
