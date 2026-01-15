@@ -11,12 +11,12 @@ The system uses a two-layered defense: **Heuristic Rules** and **XGBoost Machine
 ### 1. Heuristic Rules (Rule-Based)
 | Rule | Severity | Trigger | Result |
 | :--- | :--- | :--- | :--- |
-| **Max Limit Exceeded** | High | Amount > 50,000 BDT | **BLOCK** |
+| **Max Limit Exceeded** | High | Amount > 100,000 BDT | **BLOCK** |
 | **Historical Spike** | High | Amount > 2x your historical max | **BLOCK** |
 | **Velocity Spike** | Medium-High | 3+ transfers in 5 mins (value > 500 BDT) | **BLOCK** |
 | **Testing Pattern** | Medium-High | Small transfers followed by a large one | **BLOCK** |
-| **New High-Value Receiver**| Medium | First time sending to someone (amt > 2,500) | **BLOCK** |
-| **Average Spike** | Medium | Amount significantly above your average | **BLOCK** |
+| **New High-Value Receiver**| Medium | First time sending to someone (amt > 25,000) | **BLOCK** |
+| **Average Spike** | Medium | Amount > 1.5x your average | **BLOCK** |
 | **Off-Hours / Weekend** | Low | Late-night high-value transactions | **WARNING ONLY** |
 
 ### 2. Machine Learning (XGBoost)
@@ -75,7 +75,7 @@ If you trigger any of these, a single Face Scan grants a **5-minute bypass**:
 
 ### 2. Unbypassable Cases (The Hard Stop)
 The following requires **Manual Review** and CANNOT be bypassed with a face scan:
-- **Critical Velocity**: Sending multiple high-value transactions (≥2,500 BDT) in a very short time window. 
+- **Critical Velocity**: Sending multiple high-value transactions (≥50,000 BDT) in a very short time window. 
   - *Reason: This prevents a thief from rapidly draining your wallet even if they get one successful scan.*
 
 ### 3. Automatic Account Cleanup
