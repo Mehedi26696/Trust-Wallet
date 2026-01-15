@@ -68,7 +68,7 @@ class _CashInScreenState extends State<CashInScreen> {
         // Clear form and go back
         amountController.clear();
         descriptionController.clear();
-        context.pop();
+        context.go('/home');
       } else {
         String msg = 'Failed to add funds';
         try {
