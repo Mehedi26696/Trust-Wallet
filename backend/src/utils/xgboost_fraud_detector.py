@@ -160,30 +160,36 @@ def xgboost_fraud_check(
         - details: Dictionary with additional information
     """
     try:
-        # Load model
+        # Load the trained XGBoost model
         model = load_xgboost_model()
         
-        # Build features
+        # Build features for prediction
         features = build_xgboost_features(
             session, sender_id, receiver_id, amount, transaction_type
         )
         
-        # Convert to DataFrame (model expects DataFrame)
+        # Convert to DataFrame for model prediction
         df = pd.DataFrame([features])
         
-        # Predict
-        is_fraud_pred = model.predict(df)[0]  # 0 or 1
-        fraud_prob = model.predict_proba(df)[0][1]  # Probability of class 1 (fraud)
+        # Get prediction and probability
+        is_fraud = model.predict(df)[0]
+        fraud_probability = model.predict_proba(df)[0][1]  # Probability of class 1 (fraud)
+        
+        # Fraud threshold (configurable)
+        fraud_threshold = 0.5
         
         # Build response details
         details = {
             "model": "xgboost",
             "features": features,
-            "fraud_probability": float(fraud_prob),
-            "threshold": 0.5,  # Standard threshold for binary classification
+            "fraud_probability": float(fraud_probability),
+            "threshold": fraud_threshold,
+            "prediction": int(is_fraud),
         }
         
-        return bool(is_fraud_pred), float(fraud_prob), details
+        # Return fraud decision based on threshold
+        is_fraudulent = fraud_probability >= fraud_threshold
+        return is_fraudulent, float(fraud_probability), details
     
     except Exception as e:
         # Fail open: if model fails, allow transaction but log error

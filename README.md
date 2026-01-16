@@ -46,7 +46,7 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 
 - **Bank-grade Security**: Multi-layered security with JWT authentication and bcrypt password hashing
 - **AI-Powered Fraud Detection**: XGBoost models for real-time transaction monitoring with 95%+ accuracy
-- **Groq AI Integration**: LLaMA 3.3 70B for intelligent, context-aware risk messaging
+- **Groq AI Integration**: LLaMA 3.1 8B Instant for intelligent, context-aware risk messaging
 - **DeepFace Biometric Security**: Advanced facial recognition for high-risk transaction verification
 - **Bangladesh-specific**: NID validation supporting 10, 13, and 17-digit formats
 - **Modern Mobile App**: Beautiful Flutter UI with real-time fee calculation
@@ -98,27 +98,55 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 
 #### XGBoost-based ML Detection
 
-- Real-time transaction pattern analysis
-- Velocity checks (multiple high-value transactions)
-- Risk scoring system (0-100% scale)
-- Historical behavior analysis
-- Feature engineering with 20+ transaction attributes
-- Model performance: 95%+ accuracy on test data
-- Step-up verification: If risk score > 50%, face verification is required on confirm screen
+- **Real-time fraud prediction** using trained XGBoost classifier
+- **Risk scoring system**: Returns probability (0-100%) for each transaction
+- **Transaction pattern analysis**: Analyzes amount, time, transaction type, account types
+- **Feature engineering**: Uses 9 key features (amount, debited/credited amounts, hour, day, date, user types)
+- **Model performance**: 95%+ ROC-AUC on test data
+- **Fraud threshold**: Transactions with ≥50% fraud probability are flagged
+- **Step-up verification**: If risk score > 50%, face verification is required on confirm screen
+- **Limitations**: Does NOT track receiver-specific patterns (e.g., repeated transactions to same person)
 
 #### Rule-based Fraud Prevention
 
-- High-value transaction alerts (>100,000 BDT)
-- Velocity rules (3+ transactions ≥50,000 BDT in 5 minutes)
-- Automatic transaction blocking for suspicious activities
-- Granular severity levels: critical, high, medium-high, medium, medium-low, low
-- Smart blocking: only medium severity and above are blocked
-- User-friendly warnings for low-severity alerts
+- **Absolute limits**: Max transaction amount (100,000 BDT default)
+- **Historical comparison**: Flags amounts >2x user's historical maximum
+- **Average spike detection**: Alerts when amount >1.5x recent average
+- **Velocity rules**: Blocks 3+ transactions ≥50,000 BDT in 5 minutes
+- **High-value monitoring**: Tracks multiple high-value transactions in time window
+- **First-time receiver check**: Flags first transaction to new receiver with high amount
+- **Testing pattern detection**: Identifies small test followed by large transaction
+- **Time-based alerts**: Late night (22:00-06:00) and weekend high-value warnings
+- **Granular severity levels**: critical, high, medium-high, medium, low
+- **Smart blocking**: Only medium severity and above block transactions
+- **Note**: Does NOT currently track total transaction count to same receiver over time
+
+#### Repeated Transaction Detection (Limitation)
+
+**Current State**:
+- The system does NOT specifically track how many times you send money to the same person
+- XGBoost model only sees transaction-level features, not receiver history
+- Rule-based checks only flag the **first** transaction to a new receiver (if high-value)
+
+**Example Scenario**:
+- If you send 100 BDT to Person A 1000 times, then send the 1001st time:
+  - ✗ XGBoost: Won't detect (no receiver-specific features)
+  - ✗ Rule-based: Only flagged the 1st transaction, not subsequent ones
+  - ✓ Velocity check: May trigger if 3+ transactions in 5 minutes
+
+**How to Add This Detection**:
+To detect repeated transactions to the same person, you would need to add a new rule:
+```python
+# Count transactions to same receiver in last 24 hours
+if len(transactions_to_receiver) >= 10:
+    flag_as_suspicious("Excessive transactions to same receiver")
+```
+This feature can be implemented as a new fraud detection rule if needed.
 
 #### Groq AI-Powered Message Enhancement
 
 - **Intelligent Risk Communication**
-  - AI-enhanced fraud warnings using Groq LLaMA 3.3 70B model
+  - AI-enhanced fraud warnings using Groq LLaMA 3.1 8B Instant model
   - Context-aware messages based on risk level and transaction details
   - User-friendly explanations instead of technical jargon
   - Actionable guidance for users on how to proceed safely
@@ -197,7 +225,7 @@ TrustWallet is a comprehensive digital wallet solution built for the Bangladesh 
 | **numpy**        | Numerical computations           | Latest  |
 | **joblib**       | Model serialization              | Latest  |
 | **DeepFace**     | Face recognition & verification  | Latest  |
-| **Groq SDK**     | AI message enhancement (LLaMA 3) | Latest  |
+| **Groq SDK**     | AI message enhancement (LLaMA 3.1) | Latest  |
 | **TensorFlow**   | Deep learning backend (DeepFace) | Latest  |
 
 ### Frontend
@@ -874,14 +902,19 @@ For complete API documentation, visit the interactive docs at `/docs` when runni
 
 **Purpose**: Primary fraud detection using gradient boosting classifier
 
-**Features Used**:
+**Features Used** (9 total):
 
 - **Transaction amount**: Amount being transferred
 - **Transaction type**: PAYMENT, TRANSFER, CASH_OUT, CASH_IN, DEBIT
 - **Payer debited**: Amount deducted from sender's balance
-- **Receiver credited**: Amount credited to receiver's balance
-- **Time features**: Hour of day, day of week, date
-- **User types**: Payer type (Customer/Merchant), Receiver type (Customer/Merchant)
+- **Receiver credited**: Amount credited to receiver's balance (0 for fraud patterns)
+- **Time features**: Hour of day (0-23), day of week (0-6), date (1-31)
+- **User types**: Payer type (C=Customer, M=Merchant), Receiver type (C=Customer, M=Merchant)
+
+**Note**: The model does NOT track:
+- Number of previous transactions to specific receiver
+- Transaction frequency to same person
+- Historical relationship between sender and receiver
 
 **Pipeline Components**:
 
@@ -1006,7 +1039,7 @@ Response: {"verified": true, "confidence": 0.95}
 
 **Purpose**: Transform technical fraud alerts into user-friendly, actionable messages
 
-**Model**: LLaMA 3.3 70B Versatile (Groq's optimized inference)
+**Model**: LLaMA 3.1 8B Instant (Groq's optimized inference)
 
 **Features**:
 
@@ -1140,7 +1173,7 @@ BLOCK_ML_ANOMALY=False  # Set to True to block ML-detected fraud
 
 # Groq AI (for enhanced risk messages)
 GROQ_API_KEY=your-groq-api-key-here  # Get from https://console.groq.com
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=llama-3.1-8b-instant
 GROQ_ENABLED=True  # Set to False to disable AI enhancement
 
 # NID Validation
@@ -1164,7 +1197,7 @@ FACES_DIR=./media/faces
 
 2. **Features**:
    - Free tier: 30 requests/minute
-   - Models: LLaMA 3.3 70B, LLaMA 3.1 8B, Mixtral, Gemma
+   - Models: LLaMA 3.1 8B Instant (default), LLaMA 3.3 70B, Mixtral, Gemma
    - Ultra-fast inference (~500 tokens/second)
 
 3. **Benefits**:
